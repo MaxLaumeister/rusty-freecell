@@ -187,8 +187,8 @@ impl Game {
             \x20----- \n", card_str);
         self.print_chars_at_location(buffer, x, y, pl_str.as_str());
     }
-    fn print_chars_at_location (&self, buffer: &mut [String; TERM_HEIGHT], x: usize, y: usize, towrite: &str) {
-        for (i, line_to_write) in towrite.lines().enumerate() {
+    fn print_chars_at_location (&self, buffer: &mut [String; TERM_HEIGHT], x: usize, y: usize, lines_to_write: &str) {
+        for (i, line_to_write) in lines_to_write.lines().enumerate() {
             if y as usize + i >= buffer.len() {
                 println!("break");
                 break;
