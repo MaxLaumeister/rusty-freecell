@@ -12,7 +12,9 @@ const TABLEAU_SIZE: i8 = 8;
 
 const TERM_WIDTH: usize = 80;
 const TERM_HEIGHT: usize = 24;
-const CARD_WIDTH: usize = 8;
+const CARD_WIDTH: usize = 7;
+const CARD_HEIGHT: usize = 5;
+const TABLEAU_VERTICAL_OFFSET: usize = 2;
 
 #[derive(Copy, Clone)]
 struct Card {
@@ -84,7 +86,7 @@ impl Board {
         deck.shuffle(rng);
 
         // Deal out onto the board
-        let mut column: i8 = 0;
+        let mut column = 0;
         for card in deck.cards {
             board.put_on_tableau(card, column as usize);
             column += 1;
@@ -96,73 +98,126 @@ impl Board {
         board
     }
 
-    fn put_on_tableau(&mut self, c: Card, n: usize) {
-        self.tableau[n][self.tableau_lengths[n]] = Some(c);
-        self.tableau_lengths[n] += 1;
+    fn put_on_tableau(&mut self, c: Card, column: usize) {
+        //println!("putting card at {}", column);
+        self.tableau[column][self.tableau_lengths[column]] = Some(c);
+        self.tableau_lengths[column] += 1;
     }
 }
 
 struct Game {
-    board: Board,
-    display_buf: [String; TERM_HEIGHT],
-    hello: String,
-    helloarr: [String; 3]
+    board: Board
 }
 
 impl Game {
     fn new(rng: &mut rand::rngs::ThreadRng) -> Game {
-        let mut game = Game {
-            board: Board::new(rng),
-            display_buf: core::array::from_fn(|i| "x".repeat(TERM_WIDTH).to_string()),
-            hello: "hellostr".to_string(),
-            helloarr: core::array::from_fn(|i| i.to_string())
+        let game = Game {
+            board: Board::new(rng)
         };
         game
     }
     fn print(&self) {
-        for line in &self.display_buf {
+        let mut display_buf: [String; TERM_HEIGHT] = core::array::from_fn(|_| " ".repeat(TERM_WIDTH).to_string());
+        // Write to buffer
+
+        // Write foundations
+
+        for (x, &card) in self.board.foundations.iter().enumerate() {
+            self.print_card(&mut display_buf, x * CARD_WIDTH, 1, card);
+        }
+
+        // Write freecells
+
+        for (x, &card) in self.board.freecells.iter().enumerate() {
+            self.print_card(&mut display_buf, SUITS as usize * CARD_WIDTH + x * CARD_WIDTH + 2, 1, card);
+        }
+
+        // Write tableau
+
+        for (x, &column) in self.board.tableau.iter().enumerate() {
+            for (y, &card) in column.iter().enumerate() {
+                if y >= self.board.tableau_lengths[x] {
+                    continue;
+                }
+                self.print_card(&mut display_buf, x * CARD_WIDTH + 1, y * TABLEAU_VERTICAL_OFFSET + CARD_HEIGHT + 2, card);
+            }
+        }
+
+        // Print buffer
+
+        for line in display_buf {
             println!("{}", line);
         }
-        println!("{}", self.hello);
-        for string in &self.helloarr {
-            println!("{}", string);
-        }
     }
-    fn print_placeholder (&mut self, x: i8, y: i8) {
-        let pl_str = "\
-            \x20------ \n\
-               |      |\n\
-               |  --  |\n\
-               |      |\n\
-               |      |\n\
-            \x20------ \n";
-        self.print_chars_at_location(x, y, pl_str);
+    fn print_card(&self, buffer: &mut [String; TERM_HEIGHT],x: usize, y: usize, card: Option<Card>) {
+        // println!("Printing Card {} At Location: ({}, {})", match card {
+        //     Some(card) => card.rank,
+        //     None => 0
+        // }, x, y);
+        let card_str = match card {
+            Some(card) => format!("{}{}", match card.rank {
+                1 => "1",
+                2 => "2",
+                3 => "3",
+                4 => "4",
+                5 => "5",
+                6 => "6",
+                7 => "7",
+                8 => "8",
+                9 => "9",
+                10 => "10",
+                11 => "J",
+                12 => "Q",
+                13 => "K",
+                _ => "X"
+            }, match card.suit {
+                HEARTS => "h",
+                CLUBS => "c",
+                DIAMONDS => "d",
+                SPADES => "s",
+                _ => "X"
+            }),
+            None => "--".to_string()
+        };
+        let pl_str = format!("\
+            \x20----- \n\
+               | {: <3} |\n\
+               |     |\n\
+               |     |\n\
+            \x20----- \n", card_str);
+        self.print_chars_at_location(buffer, x, y, pl_str.as_str());
     }
-    fn print_chars_at_location (&mut self, x: i8, y: i8, towrite: &str) {
-        for (i, line) in towrite.lines().enumerate() {
-            let buffer = &mut self.display_buf[y as usize + i];
-            buffer.replace_range(x as usize..(line.len() + (x as usize)), line);
+    fn print_chars_at_location (&self, buffer: &mut [String; TERM_HEIGHT], x: usize, y: usize, towrite: &str) {
+        for (i, line_to_write) in towrite.lines().enumerate() {
+            if y as usize + i >= buffer.len() {
+                println!("break");
+                break;
+            }
+            if x as usize + line_to_write.len() >= buffer[y as usize + i].len() {
+                println!("continue");
+                continue;
+            }
+            buffer[y as usize + i].replace_range(x as usize..(line_to_write.len() + (x as usize)), line_to_write);
         }
     }
 }
 
 fn main() {
-    println!("Welcome to Rust");
-    let card1 = Card {rank: 10, suit: CLUBS};
-    println!("Your Card: {}", card1);
+    //println!("Welcome to Rust");
+    //let card1 = Card {rank: 10, suit: CLUBS};
+    //println!("Your Card: {}", card1);
 
-    let mut deck1 = Deck::standard();
-    println!("Your Deck: {}", deck1);
-    let mut rng = rand::thread_rng();
-    deck1.shuffle(&mut rng);
-    println!("Shuffled Deck: {}", deck1);
+    //let mut deck1 = Deck::standard();
+    //println!("Your Deck: {}", deck1);
+    // deck1.shuffle(&mut rng);
+    //println!("Shuffled Deck: {}", deck1);
 
-    let array1 = [10; 5];
-    println!("el 0: {}", array1[0]);
-    println!("el 1: {}", array1[1]);
+    // let array1 = [10; 5];
+    // println!("el 0: {}", array1[0]);
+    // println!("el 1: {}", array1[1]);
 
     // Create game
-    let mut game = Game::new(&mut rng);
-    game.print_placeholder(10, 10);
+    let mut rng = rand::thread_rng();
+    let game = Game::new(&mut rng);
     game.print();
 }
