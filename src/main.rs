@@ -1,3 +1,9 @@
+use std::io::{stdout, Write};
+
+use crossterm::{
+    cursor, event::{self, Event, KeyCode, KeyEvent}, execute, style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor}, terminal::{size, Clear, ClearType, ScrollUp, SetSize}, ExecutableCommand
+};
+
 const RANKS: i8 = 13;
 const SUITS: i8 = 4;
 const DECK_SIZE: i8 = RANKS* SUITS;
@@ -159,8 +165,9 @@ impl Game {
 
         // Print buffer
 
-        for line in display_buf {
+        for (y, line) in display_buf.iter().enumerate() {
             println!("{}", line);
+            let _ = stdout().execute(cursor::MoveTo(0, y as u16));
         }
     }
     fn print_card(&self, buffer: &mut [String; TERM_HEIGHT],x: usize, y: usize, card: Option<Card>, selected: bool) {
@@ -226,22 +233,48 @@ impl Game {
     }
 }
 
-fn main() {
-    //println!("Welcome to Rust");
-    //let card1 = Card {rank: 10, suit: CLUBS};
-    //println!("Your Card: {}", card1);
-
-    //let mut deck1 = Deck::standard();
-    //println!("Your Deck: {}", deck1);
-    // deck1.shuffle(&mut rng);
-    //println!("Shuffled Deck: {}", deck1);
-
-    // let array1 = [10; 5];
-    // println!("el 0: {}", array1[0]);
-    // println!("el 1: {}", array1[1]);
+fn run() -> Result<(), Box<dyn std::error::Error>> {
+    
+    // Prepare terminal
+    let mut stdout = stdout();
+    crossterm::terminal::enable_raw_mode()?;
+    stdout.execute(Clear(ClearType::All))?;
+    stdout.execute(SetForegroundColor(Color::Blue))?;
+    stdout.execute(SetBackgroundColor(Color::Red))?;
+    stdout.execute(Print("Styled text here."))?;
+    stdout.execute(ResetColor)?;
 
     // Create game
     let mut rng = rand::thread_rng();
     let game = Game::new(&mut rng);
     game.print();
+
+    // Game loop
+    loop {
+        if let Event::Key(event) = event::read().expect("Failed to read line") {
+            match event {
+                KeyEvent {
+                    code: KeyCode::Char('q'),
+                    modifiers: event::KeyModifiers::NONE,
+                    kind: _,
+                    state: _} => break,
+                _ => {
+                    game.print();
+                }
+            }
+            println!("{:?}\r", event);
+        };
+    }
+
+    Ok(())
+}
+
+fn cleanup() {
+    crossterm::terminal::disable_raw_mode().unwrap_or_else(|_| panic!());
+    println!();
+}
+
+fn main() -> impl std::process::Termination {
+    let _ = run();
+    cleanup();
 }
