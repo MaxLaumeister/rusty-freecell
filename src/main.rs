@@ -68,7 +68,7 @@ impl std::fmt::Display for Card {
 
 struct Board {
     foundations: [Option<Card>; SUITS as usize],
-    freecells: [Option<Card>; FREE_CELLS as usize],
+    free_cells: [Option<Card>; FREE_CELLS as usize],
     tableau: [[Option<Card>; DECK_SIZE as usize]; TABLEAU_SIZE as usize],
     tableau_lengths: [usize; TABLEAU_SIZE as usize]
 }
@@ -77,7 +77,7 @@ impl Board {
     fn new(rng: &mut rand::rngs::ThreadRng) -> Board {
         let mut board = Board {
             foundations: [None; SUITS as usize],
-            freecells: [None; FREE_CELLS as usize],
+            free_cells: [None; FREE_CELLS as usize],
             tableau: [[None; DECK_SIZE as usize]; TABLEAU_SIZE as usize],
             tableau_lengths: [0; TABLEAU_SIZE as usize]
         };
@@ -106,13 +106,15 @@ impl Board {
 }
 
 struct Game {
-    board: Board
+    board: Board,
+    selected_card: usize
 }
 
 impl Game {
     fn new(rng: &mut rand::rngs::ThreadRng) -> Game {
         let game = Game {
-            board: Board::new(rng)
+            board: Board::new(rng),
+            selected_card: SUITS as usize + FREE_CELLS as usize
         };
         game
     }
@@ -123,13 +125,13 @@ impl Game {
         // Write foundations
 
         for (x, &card) in self.board.foundations.iter().enumerate() {
-            self.print_card(&mut display_buf, x * CARD_WIDTH, 1, card);
+            self.print_card(&mut display_buf, x * CARD_WIDTH, 1, card, false);
         }
 
         // Write freecells
 
-        for (x, &card) in self.board.freecells.iter().enumerate() {
-            self.print_card(&mut display_buf, SUITS as usize * CARD_WIDTH + x * CARD_WIDTH + 2, 1, card);
+        for (x, &card) in self.board.free_cells.iter().enumerate() {
+            self.print_card(&mut display_buf, SUITS as usize * CARD_WIDTH + x * CARD_WIDTH + 2, 1, card, false);
         }
 
         // Write tableau
@@ -139,8 +141,20 @@ impl Game {
                 if y >= self.board.tableau_lengths[x] {
                     continue;
                 }
-                self.print_card(&mut display_buf, x * CARD_WIDTH + 1, y * TABLEAU_VERTICAL_OFFSET + CARD_HEIGHT + 2, card);
+                self.print_card(&mut display_buf, x * CARD_WIDTH + 1, y * TABLEAU_VERTICAL_OFFSET + CARD_HEIGHT + 2, card, false);
             }
+        }
+
+        // Write currently selected card
+        let mut idx = self.selected_card;
+        if idx < SUITS as usize {
+            self.print_card(&mut display_buf, idx * CARD_WIDTH, 1, self.board.foundations[idx], true);
+        } else if idx < SUITS as usize + FREE_CELLS as usize {
+            idx = idx % SUITS as usize;
+            self.print_card(&mut display_buf, SUITS as usize * CARD_WIDTH + idx * CARD_WIDTH + 2, 1, self.board.free_cells[idx], true);
+        } else if idx < SUITS as usize + FREE_CELLS as usize + TABLEAU_SIZE as usize {
+            idx = idx % (SUITS as usize + FREE_CELLS as usize);
+            self.print_card(&mut display_buf, idx * CARD_WIDTH + 1, (self.board.tableau_lengths[idx] - 1) * TABLEAU_VERTICAL_OFFSET + CARD_HEIGHT + 2, self.board.tableau[idx][self.board.tableau_lengths[idx] - 1], true);
         }
 
         // Print buffer
@@ -149,7 +163,7 @@ impl Game {
             println!("{}", line);
         }
     }
-    fn print_card(&self, buffer: &mut [String; TERM_HEIGHT],x: usize, y: usize, card: Option<Card>) {
+    fn print_card(&self, buffer: &mut [String; TERM_HEIGHT],x: usize, y: usize, card: Option<Card>, selected: bool) {
         // println!("Printing Card {} At Location: ({}, {})", match card {
         //     Some(card) => card.rank,
         //     None => 0
@@ -179,12 +193,22 @@ impl Game {
             }),
             None => "--".to_string()
         };
-        let pl_str = format!("\
+        let pl_str;
+        if selected {
+            pl_str = format!("\
+            \x20OOOOO \n\
+               O {: <3} O\n\
+               O     O\n\
+               O     O\n\
+            \x20OOOOO \n", card_str);
+        } else {
+            pl_str = format!("\
             \x20----- \n\
                | {: <3} |\n\
                |     |\n\
                |     |\n\
             \x20----- \n", card_str);
+        }
         self.print_chars_at_location(buffer, x, y, pl_str.as_str());
     }
     fn print_chars_at_location (&self, buffer: &mut [String; TERM_HEIGHT], x: usize, y: usize, lines_to_write: &str) {
