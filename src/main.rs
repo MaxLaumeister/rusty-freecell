@@ -113,14 +113,16 @@ impl Board {
 
 struct Game {
     board: Board,
-    selected_card: usize
+    highlighted_card: i8,
+    selected_card: i8
 }
 
 impl Game {
     fn new(rng: &mut rand::rngs::ThreadRng) -> Game {
         let game = Game {
             board: Board::new(rng),
-            selected_card: SUITS as usize + FREE_CELLS as usize
+            highlighted_card: SUITS + FREE_CELLS,
+            selected_card: -1
         };
         game
     }
@@ -130,13 +132,13 @@ impl Game {
         // Write foundations
 
         for (x, &card) in self.board.foundations.iter().enumerate() {
-            Game::print_card(&out, x * CARD_WIDTH, 1, card, false);
+            Game::print_card_at_coord(&out, x * CARD_WIDTH, 1, card, false);
         }
 
         // Write freecells
 
         for (x, &card) in self.board.free_cells.iter().enumerate() {
-            Game::print_card(&out, SUITS as usize * CARD_WIDTH + x * CARD_WIDTH + 2, 1, card, false);
+            Game::print_card_at_coord(&out, SUITS as usize * CARD_WIDTH + x * CARD_WIDTH + 2, 1, card, false);
         }
 
         // Write tableau
@@ -146,23 +148,30 @@ impl Game {
                 if y >= self.board.tableau_lengths[x] {
                     continue;
                 }
-                Game::print_card(&out, x * CARD_WIDTH + 1, y * TABLEAU_VERTICAL_OFFSET + CARD_HEIGHT + 2, card, false);
+                Game::print_card_at_coord(&out, x * CARD_WIDTH + 1, y * TABLEAU_VERTICAL_OFFSET + CARD_HEIGHT + 2, card, false);
             }
         }
 
-        // Write currently selected card
-        let mut idx = self.selected_card;
-        if idx < SUITS as usize {
-            Game::print_card(&out, idx * CARD_WIDTH, 1, self.board.foundations[idx], true);
-        } else if idx < SUITS as usize + FREE_CELLS as usize {
-            idx = idx % SUITS as usize;
-            Game::print_card(&out, SUITS as usize * CARD_WIDTH + idx * CARD_WIDTH + 2, 1, self.board.free_cells[idx], true);
-        } else if idx < SUITS as usize + FREE_CELLS as usize + TABLEAU_SIZE as usize {
-            idx = idx % (SUITS as usize + FREE_CELLS as usize);
-            Game::print_card(&out, idx * CARD_WIDTH + 1, (self.board.tableau_lengths[idx] - 1) * TABLEAU_VERTICAL_OFFSET + CARD_HEIGHT + 2, self.board.tableau[idx][self.board.tableau_lengths[idx] - 1], true);
+        // Write currently highlighted card
+        Game::print_top_card_at_index(self, out, self.highlighted_card as usize, true);
+
+        // Write selected card, if any
+        if self.selected_card > 0 {
+            Game::print_top_card_at_index(self, out, self.selected_card as usize, true);
         }
     }
-    fn print_card(out: &Stdout, x: usize, y: usize, card: Option<Card>, selected: bool) {
+    fn print_top_card_at_index(&self, out: &Stdout, mut idx: usize, selected: bool) {
+        if idx < SUITS as usize {
+            Game::print_card_at_coord(&out, idx * CARD_WIDTH, 1, self.board.foundations[idx], selected);
+        } else if idx < SUITS as usize + FREE_CELLS as usize {
+            idx = idx % SUITS as usize;
+            Game::print_card_at_coord(&out, SUITS as usize * CARD_WIDTH + idx * CARD_WIDTH + 2, 1, self.board.free_cells[idx], selected);
+        } else if idx < SUITS as usize + FREE_CELLS as usize + TABLEAU_SIZE as usize {
+            idx = idx % (SUITS as usize + FREE_CELLS as usize);
+            Game::print_card_at_coord(&out, idx * CARD_WIDTH + 1, (self.board.tableau_lengths[idx] - 1) * TABLEAU_VERTICAL_OFFSET + CARD_HEIGHT + 2, self.board.tableau[idx][self.board.tableau_lengths[idx] - 1], selected);
+        }
+    }
+    fn print_card_at_coord(out: &Stdout, x: usize, y: usize, card: Option<Card>, selected: bool) {
 
         let card_str = match card {
             Some(card) => format!("{}{}", match card.rank {
@@ -218,20 +227,23 @@ impl Game {
         // println!("hello world");
     }
 
-    fn moveLeft(&mut self) {
-        if self.selected_card == 0 {
-            self.selected_card = (SUITS + FREE_CELLS + TABLEAU_SIZE - 1) as usize;
+    fn move_left(&mut self) {
+        if self.highlighted_card == 0 {
+            self.highlighted_card = SUITS + FREE_CELLS + TABLEAU_SIZE - 1;
         } else {
-            self.selected_card -= 1;
+            self.highlighted_card -= 1;
         }
     }
 
-    fn moveRight(&mut self) {
-        if self.selected_card >= (SUITS + FREE_CELLS + TABLEAU_SIZE - 1) as usize {
-            self.selected_card = 0;
+    fn move_right(&mut self) {
+        if self.highlighted_card >= SUITS + FREE_CELLS + TABLEAU_SIZE - 1 {
+            self.highlighted_card = 0;
         } else {
-            self.selected_card += 1;
+            self.highlighted_card += 1;
         }
+    }
+    fn select_current_card(&mut self) {
+        self.selected_card = self.highlighted_card;
     }
 }
 
@@ -260,10 +272,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     break
                 },
                 KeyEvent {code: KeyCode::Left, modifiers: event::KeyModifiers::NONE, kind: _, state: _} => {
-                    game.moveLeft();
+                    game.move_left();
                 },
                 KeyEvent {code: KeyCode::Right, modifiers: event::KeyModifiers::NONE, kind: _, state: _} => {
-                    game.moveRight();
+                    game.move_right();
+                },
+                KeyEvent {code: KeyCode::Char(' '), modifiers: event::KeyModifiers::NONE, kind: _, state: _} => {
+                    game.select_current_card();
                 },
                 _ => {
                     
