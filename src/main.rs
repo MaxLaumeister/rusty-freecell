@@ -1,26 +1,28 @@
 const RANKS: i8 = 13;
 const SUITS: i8 = 4;
+const DECK_SIZE: usize = RANKS as usize * SUITS as usize;
 
 const HEARTS: i8 = 0;
 const DIAMONDS: i8 = 1;
 const CLUBS: i8 = 2;
 const SPADES: i8 = 3;
 
+#[derive(Copy, Clone)]
 struct Card {
     rank: i8,
     suit: i8
 }
 
 struct Deck {
-    cards: Vec<Card>
+    cards: [Card; DECK_SIZE]
 }
 
 impl Deck {
     fn standard() -> Deck {
-        let mut deck = Deck {cards: Vec::with_capacity(RANKS as usize * SUITS as usize)};
-        for r in 1..RANKS+1 {
+        let mut deck = Deck {cards: [Card {rank: 0, suit: 0}; DECK_SIZE]};
+        for r in 0..RANKS {
             for s in 0..SUITS {
-                deck.cards.push(Card{rank: r, suit: s});
+                deck.cards[(s*RANKS+r) as usize] = Card{rank: r+1, suit: s};
             }
         }
         deck
@@ -57,4 +59,8 @@ fn main() {
     println!("Your Card: {}", card1);
     let deck1 = Deck::standard();
     println!("Your Deck: {}", deck1);
+
+    let array1 = [10; 5];
+    println!("el 0: {}", array1[0]);
+    println!("el 1: {}", array1[1]);
 }
