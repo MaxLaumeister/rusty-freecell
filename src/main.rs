@@ -12,6 +12,7 @@ const TABLEAU_SIZE: i8 = 8;
 
 const TERM_WIDTH: usize = 80;
 const TERM_HEIGHT: usize = 24;
+const CARD_WIDTH: usize = 8;
 
 #[derive(Copy, Clone)]
 struct Card {
@@ -103,33 +104,44 @@ impl Board {
 
 struct Game {
     board: Board,
-    display_buf: [[char; TERM_WIDTH]; TERM_HEIGHT]
+    display_buf: [String; TERM_HEIGHT],
+    hello: String,
+    helloarr: [String; 3]
 }
 
 impl Game {
     fn new(rng: &mut rand::rngs::ThreadRng) -> Game {
         let mut game = Game {
             board: Board::new(rng),
-            display_buf: [['X'; TERM_WIDTH]; TERM_HEIGHT]
+            display_buf: core::array::from_fn(|i| "x".repeat(TERM_WIDTH).to_string()),
+            hello: "hellostr".to_string(),
+            helloarr: core::array::from_fn(|i| i.to_string())
         };
         game
     }
     fn print(&self) {
-        for line in self.display_buf {
-            for character in line {
-                print!("{}", character);
-            }
-            println!();
+        for line in &self.display_buf {
+            println!("{}", line);
+        }
+        println!("{}", self.hello);
+        for string in &self.helloarr {
+            println!("{}", string);
         }
     }
     fn print_placeholder (&mut self, x: i8, y: i8) {
-        let pl_str = " ------ ";
+        let pl_str = "\
+            \x20------ \n\
+               |      |\n\
+               |  --  |\n\
+               |      |\n\
+               |      |\n\
+            \x20------ \n";
+        self.print_chars_at_location(x, y, pl_str);
     }
-    fn print_chars_at_location (&mut self, x: i8, y: i8, chars: &[char]) {
-        for c in chars {
-            let mut count: usize = 0;
-            self.display_buf[y as usize][x as usize + count] = *c;
-            count += 1;
+    fn print_chars_at_location (&mut self, x: i8, y: i8, towrite: &str) {
+        for (i, line) in towrite.lines().enumerate() {
+            let buffer = &mut self.display_buf[y as usize + i];
+            buffer.replace_range(x as usize..(line.len() + (x as usize)), line);
         }
     }
 }
@@ -150,6 +162,7 @@ fn main() {
     println!("el 1: {}", array1[1]);
 
     // Create game
-    let game = Game::new(&mut rng);
+    let mut game = Game::new(&mut rng);
+    game.print_placeholder(10, 10);
     game.print();
 }
