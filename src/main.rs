@@ -27,6 +27,10 @@ impl Deck {
         }
         deck
     }
+    fn shuffle(&mut self, rng: &mut rand::rngs::ThreadRng) {
+        use rand::seq::SliceRandom;
+        self.cards.shuffle(rng);
+    }
 }
 
 impl std::fmt::Display for Deck {
@@ -57,8 +61,12 @@ fn main() {
     println!("Welcome to Rust");
     let card1 = Card {rank: 10, suit: CLUBS};
     println!("Your Card: {}", card1);
-    let deck1 = Deck::standard();
+
+    let mut deck1 = Deck::standard();
     println!("Your Deck: {}", deck1);
+    let mut rng = rand::thread_rng();
+    deck1.shuffle(&mut rng);
+    println!("Shuffled Deck: {}", deck1);
 
     let array1 = [10; 5];
     println!("el 0: {}", array1[0]);
