@@ -46,6 +46,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "freecellrusty"
+version = "0.1.0"
+dependencies = [
+ "crossterm",
+ "rand",
+]
+
+[[package]]
 name = "getrandom"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -156,14 +164,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "469052894dcb553421e483e4209ee581a45100d31b4018de03e5a7ad86374a7e"
 dependencies = [
  "bitflags",
-]
-
-[[package]]
-name = "rustyfreecell"
-version = "0.1.0"
-dependencies = [
- "crossterm",
- "rand",
 ]
 
 [[package]]

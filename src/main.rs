@@ -1,4 +1,4 @@
-use std::io::{stdout, Write};
+use std::io::{stdout, Stdout, Write};
 
 use crossterm::{
     cursor, event::{self, Event, KeyCode, KeyEvent}, execute, style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor}, terminal::{size, Clear, ClearType, ScrollUp, SetSize}, ExecutableCommand
@@ -124,20 +124,19 @@ impl Game {
         };
         game
     }
-    fn print(&self) {
-        let mut display_buf: [String; TERM_HEIGHT] = core::array::from_fn(|_| " ".repeat(TERM_WIDTH).to_string());
+    fn print(&self, out: &Stdout) {
         // Write to buffer
 
         // Write foundations
 
         for (x, &card) in self.board.foundations.iter().enumerate() {
-            self.print_card(&mut display_buf, x * CARD_WIDTH, 1, card, false);
+            Game::print_card(&out, x * CARD_WIDTH, 1, card, false);
         }
 
         // Write freecells
 
         for (x, &card) in self.board.free_cells.iter().enumerate() {
-            self.print_card(&mut display_buf, SUITS as usize * CARD_WIDTH + x * CARD_WIDTH + 2, 1, card, false);
+            Game::print_card(&out, SUITS as usize * CARD_WIDTH + x * CARD_WIDTH + 2, 1, card, false);
         }
 
         // Write tableau
@@ -147,34 +146,24 @@ impl Game {
                 if y >= self.board.tableau_lengths[x] {
                     continue;
                 }
-                self.print_card(&mut display_buf, x * CARD_WIDTH + 1, y * TABLEAU_VERTICAL_OFFSET + CARD_HEIGHT + 2, card, false);
+                Game::print_card(&out, x * CARD_WIDTH + 1, y * TABLEAU_VERTICAL_OFFSET + CARD_HEIGHT + 2, card, false);
             }
         }
 
         // Write currently selected card
         let mut idx = self.selected_card;
         if idx < SUITS as usize {
-            self.print_card(&mut display_buf, idx * CARD_WIDTH, 1, self.board.foundations[idx], true);
+            Game::print_card(&out, idx * CARD_WIDTH, 1, self.board.foundations[idx], true);
         } else if idx < SUITS as usize + FREE_CELLS as usize {
             idx = idx % SUITS as usize;
-            self.print_card(&mut display_buf, SUITS as usize * CARD_WIDTH + idx * CARD_WIDTH + 2, 1, self.board.free_cells[idx], true);
+            Game::print_card(&out, SUITS as usize * CARD_WIDTH + idx * CARD_WIDTH + 2, 1, self.board.free_cells[idx], true);
         } else if idx < SUITS as usize + FREE_CELLS as usize + TABLEAU_SIZE as usize {
             idx = idx % (SUITS as usize + FREE_CELLS as usize);
-            self.print_card(&mut display_buf, idx * CARD_WIDTH + 1, (self.board.tableau_lengths[idx] - 1) * TABLEAU_VERTICAL_OFFSET + CARD_HEIGHT + 2, self.board.tableau[idx][self.board.tableau_lengths[idx] - 1], true);
-        }
-
-        // Print buffer
-
-        for (y, line) in display_buf.iter().enumerate() {
-            println!("{}", line);
-            let _ = stdout().execute(cursor::MoveTo(0, y as u16));
+            Game::print_card(&out, idx * CARD_WIDTH + 1, (self.board.tableau_lengths[idx] - 1) * TABLEAU_VERTICAL_OFFSET + CARD_HEIGHT + 2, self.board.tableau[idx][self.board.tableau_lengths[idx] - 1], true);
         }
     }
-    fn print_card(&self, buffer: &mut [String; TERM_HEIGHT],x: usize, y: usize, card: Option<Card>, selected: bool) {
-        // println!("Printing Card {} At Location: ({}, {})", match card {
-        //     Some(card) => card.rank,
-        //     None => 0
-        // }, x, y);
+    fn print_card(out: &Stdout, x: usize, y: usize, card: Option<Card>, selected: bool) {
+
         let card_str = match card {
             Some(card) => format!("{}{}", match card.rank {
                 1 => "1",
@@ -216,19 +205,32 @@ impl Game {
                |     |\n\
             \x20----- \n", card_str);
         }
-        self.print_chars_at_location(buffer, x, y, pl_str.as_str());
+        for (d, line) in pl_str.lines().enumerate() {
+            let _ = stdout().execute(cursor::MoveTo(x as u16, y as u16 + d as u16));
+            print!("{}", line);
+
+            // let _ = stdout().execute(cursor::MoveTo(0, 0));
+            // print!("hello world");
+            // let _ = stdout().execute(cursor::MoveTo(0, 1));
+            // print!("hello two");
+        }
+        // let _ = stdout().execute(cursor::MoveTo(0, 0));
+        // println!("hello world");
     }
-    fn print_chars_at_location (&self, buffer: &mut [String; TERM_HEIGHT], x: usize, y: usize, lines_to_write: &str) {
-        for (i, line_to_write) in lines_to_write.lines().enumerate() {
-            if y as usize + i >= buffer.len() {
-                println!("break");
-                break;
-            }
-            if x as usize + line_to_write.len() >= buffer[y as usize + i].len() {
-                println!("continue");
-                continue;
-            }
-            buffer[y as usize + i].replace_range(x as usize..(line_to_write.len() + (x as usize)), line_to_write);
+
+    fn moveLeft(&mut self) {
+        if self.selected_card == 0 {
+            self.selected_card = (SUITS + FREE_CELLS + TABLEAU_SIZE - 1) as usize;
+        } else {
+            self.selected_card -= 1;
+        }
+    }
+
+    fn moveRight(&mut self) {
+        if self.selected_card >= (SUITS + FREE_CELLS + TABLEAU_SIZE - 1) as usize {
+            self.selected_card = 0;
+        } else {
+            self.selected_card += 1;
         }
     }
 }
@@ -236,33 +238,39 @@ impl Game {
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     
     // Prepare terminal
-    let mut stdout = stdout();
     crossterm::terminal::enable_raw_mode()?;
+    let mut stdout = stdout();
     stdout.execute(Clear(ClearType::All))?;
-    stdout.execute(SetForegroundColor(Color::Blue))?;
-    stdout.execute(SetBackgroundColor(Color::Red))?;
-    stdout.execute(Print("Styled text here."))?;
-    stdout.execute(ResetColor)?;
+
+    // stdout.execute(SetForegroundColor(Color::Blue))?;
+    // stdout.execute(SetBackgroundColor(Color::Red))?;
+    // stdout.execute(Print("Styled text here."))?;
+    // stdout.execute(ResetColor)?;
 
     // Create game
     let mut rng = rand::thread_rng();
-    let game = Game::new(&mut rng);
-    game.print();
+    let mut game = Game::new(&mut rng);
+    game.print(&stdout);
 
     // Game loop
     loop {
         if let Event::Key(event) = event::read().expect("Failed to read line") {
             match event {
-                KeyEvent {
-                    code: KeyCode::Char('q'),
-                    modifiers: event::KeyModifiers::NONE,
-                    kind: _,
-                    state: _} => break,
+                KeyEvent {code: KeyCode::Char('q'), modifiers: event::KeyModifiers::NONE, kind: _, state: _} => {
+                    break
+                },
+                KeyEvent {code: KeyCode::Left, modifiers: event::KeyModifiers::NONE, kind: _, state: _} => {
+                    game.moveLeft();
+                },
+                KeyEvent {code: KeyCode::Right, modifiers: event::KeyModifiers::NONE, kind: _, state: _} => {
+                    game.moveRight();
+                },
                 _ => {
-                    game.print();
+                    
                 }
             }
-            println!("{:?}\r", event);
+            game.print(&stdout);
+            //println!("{:?}", event);
         };
     }
 
