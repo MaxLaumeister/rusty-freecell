@@ -38,7 +38,7 @@ impl Deck {
         let mut deck = Deck {cards: [Card {rank: 0, suit: 0}; DECK_SIZE as usize]};
         for r in 0..RANKS {
             for s in 0..SUITS {
-                deck.cards[(s*RANKS+r) as usize] = Card{rank: r+1, suit: s};
+                deck.cards[(s*RANKS+r) as usize] = Card{rank: r+1, suit: s+1};
             }
         }
         deck
@@ -144,6 +144,8 @@ impl Game {
 
         for (x, &stack) in self.board.field[(SUITS + FREE_CELLS) as usize ..].iter().enumerate() {
             for (y, &card) in stack.iter().enumerate() {
+                // if no card there, continue
+                if card.rank == 0 {continue;};
                 Game::print_card_at_coord(out, x * CARD_WIDTH + 1, y * TABLEAU_VERTICAL_OFFSET + CARD_HEIGHT + 1, card, (self.highlighted_card as usize == x + (SUITS + FREE_CELLS) as usize) && y == self.board.field_lengths[x + (SUITS + FREE_CELLS) as usize] - 1, (self.selected_card as usize == x + (SUITS + FREE_CELLS) as usize) && y == self.board.field_lengths[x + (SUITS + FREE_CELLS) as usize] - 1);
             }
         }
@@ -179,10 +181,10 @@ impl Game {
                 _ => "e"
             }, match card.suit {
                 0 => " ",
-                HEARTS => "♠",
-                CLUBS => "♥",
+                HEARTS => "♥",
+                CLUBS => "♣",
                 DIAMONDS => "♦",
-                SPADES => "♣",
+                SPADES => "♠",
                 _ => "e"
             });
 
@@ -292,9 +294,9 @@ impl Game {
         self.selected_card = -1;
     }
     fn try_execute_move(&mut self, from: i8, to: i8) {
-        if self.move_is_valid(from, to) {
+        //if self.move_is_valid(from, to) {
             self.execute_move(from, to);
-        }
+        //}
     }
 }
 
