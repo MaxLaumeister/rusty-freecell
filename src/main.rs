@@ -73,41 +73,37 @@ impl std::fmt::Display for Card {
 }
 
 struct Board {
-    foundations: [Option<Card>; SUITS as usize],
-    free_cells: [Option<Card>; FREE_CELLS as usize],
-    tableau: [[Option<Card>; DECK_SIZE as usize]; TABLEAU_SIZE as usize],
-    tableau_lengths: [usize; TABLEAU_SIZE as usize]
+    field: [[Option<Card>; DECK_SIZE as usize]; (SUITS + FREE_CELLS + TABLEAU_SIZE) as usize],
+    field_lengths: [usize; (SUITS + FREE_CELLS + TABLEAU_SIZE) as usize]
 }
 
 impl Board {
     fn new(rng: &mut rand::rngs::ThreadRng) -> Board {
         let mut board = Board {
-            foundations: [None; SUITS as usize],
-            free_cells: [None; FREE_CELLS as usize],
-            tableau: [[None; DECK_SIZE as usize]; TABLEAU_SIZE as usize],
-            tableau_lengths: [0; TABLEAU_SIZE as usize]
+            field: [[None; DECK_SIZE as usize]; (SUITS + FREE_CELLS + TABLEAU_SIZE) as usize],
+            field_lengths: [0; (SUITS + FREE_CELLS + TABLEAU_SIZE) as usize]
         };
 
         let mut deck = Deck::standard();
         deck.shuffle(rng);
 
         // Deal out onto the board
-        let mut column = 0;
+        let mut tableau_column = 0;
         for card in deck.cards {
-            board.put_on_tableau(card, column as usize);
-            column += 1;
-            if column >= TABLEAU_SIZE {
-                column = 0;
+            board.put_on_tableau(card, tableau_column as usize);
+            tableau_column += 1;
+            if tableau_column >= TABLEAU_SIZE {
+                tableau_column = 0;
             }
         }
 
         board
     }
 
-    fn put_on_tableau(&mut self, c: Card, column: usize) {
-        //println!("putting card at {}", column);
-        self.tableau[column][self.tableau_lengths[column]] = Some(c);
-        self.tableau_lengths[column] += 1;
+    fn put_on_tableau(&mut self, c: Card, tableau_column: usize) {
+        let field_column = tableau_column + (SUITS + FREE_CELLS) as usize;
+        self.field[field_column][self.field_lengths[field_column]] = Some(c);
+        self.field_lengths[field_column] += 1;
     }
 }
 
@@ -127,51 +123,39 @@ impl Game {
         game
     }
     fn print(&self, out: &Stdout) {
-        // Write to buffer
+        // Print foundations
 
-        // Write foundations
-
-        for (x, &card) in self.board.foundations.iter().enumerate() {
-            Game::print_card_at_coord(&out, x * CARD_WIDTH, 1, card, false);
+        for (x, &card) in self.board.field[0..SUITS as usize].iter().enumerate() {
+            Game::print_card_at_coord(&out, x * CARD_WIDTH, 1, card[self.board.field_lengths[x]], self.highlighted_card as usize == x);
         }
 
-        // Write freecells
+        // Print freecells
 
-        for (x, &card) in self.board.free_cells.iter().enumerate() {
-            Game::print_card_at_coord(&out, SUITS as usize * CARD_WIDTH + x * CARD_WIDTH + 2, 1, card, false);
+        for (x, &card) in self.board.field[SUITS as usize .. (SUITS + FREE_CELLS) as usize].iter().enumerate() {
+            Game::print_card_at_coord(&out, SUITS as usize * CARD_WIDTH + x * CARD_WIDTH + 2, 1, card[self.board.field_lengths[x + SUITS as usize]], self.highlighted_card as usize == x + SUITS as usize);
         }
 
-        // Write tableau
+        // Print tableau
 
-        for (x, &column) in self.board.tableau.iter().enumerate() {
+        for (x, &column) in self.board.field[(SUITS + FREE_CELLS) as usize ..].iter().enumerate() {
             for (y, &card) in column.iter().enumerate() {
-                if y >= self.board.tableau_lengths[x] {
-                    continue;
+                match card {
+                    Some(_) => {
+                        Game::print_card_at_coord(&out, x * CARD_WIDTH + 1, y * TABLEAU_VERTICAL_OFFSET + CARD_HEIGHT + 2, card, (self.highlighted_card as usize == x + (SUITS + FREE_CELLS) as usize) && y == self.board.field_lengths[x + (SUITS + FREE_CELLS) as usize] - 1);
+                    }
+                    None => {
+
+                    }
                 }
-                Game::print_card_at_coord(&out, x * CARD_WIDTH + 1, y * TABLEAU_VERTICAL_OFFSET + CARD_HEIGHT + 2, card, false);
             }
         }
 
-        // Write currently highlighted card
-        Game::print_top_card_at_index(self, out, self.highlighted_card as usize, true);
+        // Print title bar
+        let _ = stdout().execute(cursor::MoveTo(0, 0));
+        println!("Rusty FreeCell");
+    }
 
-        // Write selected card, if any
-        if self.selected_card > 0 {
-            Game::print_top_card_at_index(self, out, self.selected_card as usize, true);
-        }
-    }
-    fn print_top_card_at_index(&self, out: &Stdout, mut idx: usize, selected: bool) {
-        if idx < SUITS as usize {
-            Game::print_card_at_coord(&out, idx * CARD_WIDTH, 1, self.board.foundations[idx], selected);
-        } else if idx < SUITS as usize + FREE_CELLS as usize {
-            idx = idx % SUITS as usize;
-            Game::print_card_at_coord(&out, SUITS as usize * CARD_WIDTH + idx * CARD_WIDTH + 2, 1, self.board.free_cells[idx], selected);
-        } else if idx < SUITS as usize + FREE_CELLS as usize + TABLEAU_SIZE as usize {
-            idx = idx % (SUITS as usize + FREE_CELLS as usize);
-            Game::print_card_at_coord(&out, idx * CARD_WIDTH + 1, (self.board.tableau_lengths[idx] - 1) * TABLEAU_VERTICAL_OFFSET + CARD_HEIGHT + 2, self.board.tableau[idx][self.board.tableau_lengths[idx] - 1], selected);
-        }
-    }
-    fn print_card_at_coord(out: &Stdout, x: usize, y: usize, card: Option<Card>, selected: bool) {
+    fn print_card_at_coord(out: &Stdout, x: usize, y: usize, card: Option<Card>, highlighted: bool) {
 
         let card_str = match card {
             Some(card) => format!("{}{}", match card.rank {
@@ -199,7 +183,7 @@ impl Game {
             None => "--".to_string()
         };
         let pl_str;
-        if selected {
+        if highlighted {
             pl_str = format!("\
             \x20OOOOO \n\
                O {: <3} O\n\
@@ -216,18 +200,11 @@ impl Game {
         }
         for (d, line) in pl_str.lines().enumerate() {
             let _ = stdout().execute(cursor::MoveTo(x as u16, y as u16 + d as u16));
-            print!("{}", line);
-
-            // let _ = stdout().execute(cursor::MoveTo(0, 0));
-            // print!("hello world");
-            // let _ = stdout().execute(cursor::MoveTo(0, 1));
-            // print!("hello two");
+            println!("{}", line);
         }
-        // let _ = stdout().execute(cursor::MoveTo(0, 0));
-        // println!("hello world");
     }
 
-    fn move_left(&mut self) {
+    fn move_cursor_left(&mut self) {
         if self.highlighted_card == 0 {
             self.highlighted_card = SUITS + FREE_CELLS + TABLEAU_SIZE - 1;
         } else {
@@ -235,15 +212,25 @@ impl Game {
         }
     }
 
-    fn move_right(&mut self) {
+    fn move_cursor_right(&mut self) {
         if self.highlighted_card >= SUITS + FREE_CELLS + TABLEAU_SIZE - 1 {
             self.highlighted_card = 0;
         } else {
             self.highlighted_card += 1;
         }
     }
-    fn select_current_card(&mut self) {
-        self.selected_card = self.highlighted_card;
+    fn handle_card_press(&mut self) {
+        if self.highlighted_card == -1 {
+            self.selected_card = self.highlighted_card;
+        } else {
+            self.execute_move(self.selected_card, self.highlighted_card);
+        }
+    }
+    fn execute_move(&mut self, from: i8, to: i8) {
+        // let &from_ptr;
+        // if from < SUITS + FREE_CELLS {
+        //     from_ptr = self.
+        // }
     }
 }
 
@@ -251,6 +238,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     
     // Prepare terminal
     crossterm::terminal::enable_raw_mode()?;
+    let _ = stdout().execute(cursor::Hide);
     let mut stdout = stdout();
     stdout.execute(Clear(ClearType::All))?;
 
@@ -272,13 +260,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     break
                 },
                 KeyEvent {code: KeyCode::Left, modifiers: event::KeyModifiers::NONE, kind: _, state: _} => {
-                    game.move_left();
+                    game.move_cursor_left();
                 },
                 KeyEvent {code: KeyCode::Right, modifiers: event::KeyModifiers::NONE, kind: _, state: _} => {
-                    game.move_right();
+                    game.move_cursor_right();
                 },
                 KeyEvent {code: KeyCode::Char(' '), modifiers: event::KeyModifiers::NONE, kind: _, state: _} => {
-                    game.select_current_card();
+                    game.handle_card_press();
                 },
                 _ => {
                     
@@ -293,11 +281,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn cleanup() {
-    crossterm::terminal::disable_raw_mode().unwrap_or_else(|_| panic!());
+    let mut stdout = stdout();
+    let _ = stdout.execute(cursor::Show);
+    let _ = crossterm::terminal::disable_raw_mode();
+    let _ = stdout.execute(Clear(ClearType::All));
     println!();
 }
 
 fn main() -> impl std::process::Termination {
+    std::env::set_var("RUST_BACKTRACE", "1");
     let _ = run();
     cleanup();
 }
