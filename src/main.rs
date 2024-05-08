@@ -188,11 +188,11 @@ impl Game {
         };
 
         let pl_str= format!("\
-            \x20----- \n\
-               | {: <3} |\n\
-               |     |\n\
-               |     |\n\
-            \x20----- \n",
+               ╭─────╮\n\
+               │ {: <3} │\n\
+               │     │\n\
+               │     │\n\
+               ╰─────╯\n",
             card_str);
 
         for (d, line) in pl_str.lines().enumerate() {
@@ -240,17 +240,19 @@ impl Game {
         }
     }
     fn handle_card_press(&mut self) {
-        if self.highlighted_card == -1 {
+        if self.selected_card == -1 {
+            // Select a card
             self.selected_card = self.highlighted_card;
+        } else if self.highlighted_card == self.selected_card {
+            // Deselect a card
+            self.selected_card = -1;
         } else {
+            // Execute a move
             self.execute_move(self.selected_card, self.highlighted_card);
         }
     }
     fn execute_move(&mut self, from: i8, to: i8) {
-        // let &from_ptr;
-        // if from < SUITS + FREE_CELLS {
-        //     from_ptr = self.
-        // }
+
     }
 }
 
