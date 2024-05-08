@@ -161,7 +161,7 @@ impl Game {
 
     fn print_card_at_coord(out: &Stdout, x: usize, y: usize, card: Option<Card>, highlighted: bool) {
         let mut stdout = stdout();
-        let card_str = match card {
+        let card_suit_rank_str = match card {
             Some(card) => format!("{}{}", match card.rank {
                 1 => "1",
                 2 => "2",
@@ -187,15 +187,26 @@ impl Game {
             None => "  ".to_string()
         };
 
-        let pl_str= format!("\
-               ╭─────╮\n\
-               │ {: <3} │\n\
-               │     │\n\
-               │     │\n\
-               ╰─────╯\n",
-            card_str);
+        let card_display_str;
+        // if highlighted {
+        //     card_display_str= format!("\
+        //         ╭─────╮\n\
+        //         │ {: <3} │\n\
+        //         │     │\n\
+        //         │█████│\n\
+        //         ╰─────╯\n",
+        //         card_suit_rank_str);
+        // } else {
+            card_display_str= format!("\
+            ╭─────╮\n\
+            │ {: <3} │\n\
+            │     │\n\
+            │     │\n\
+            ╰─────╯\n",
+            card_suit_rank_str);
+        // }
 
-        for (d, line) in pl_str.lines().enumerate() {
+        for (d, line) in card_display_str.lines().enumerate() {
             let _ = stdout.execute(cursor::MoveTo(x as u16, y as u16 + d as u16));
             if highlighted {
                 let _= stdout.execute(style::SetAttribute(style::Attribute::Reverse));
