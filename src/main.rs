@@ -8,10 +8,10 @@ const RANKS: i8 = 13;
 const SUITS: i8 = 4;
 const DECK_SIZE: i8 = RANKS* SUITS;
 
-const HEARTS: i8 = 0;
-const CLUBS: i8 = 1;
-const DIAMONDS: i8 = 2;
-const SPADES: i8 = 3;
+const HEARTS: i8 = 1;
+const CLUBS: i8 = 2;
+const DIAMONDS: i8 = 3;
+const SPADES: i8 = 4;
 
 const FREE_CELLS: i8 = 4;
 const TABLEAU_SIZE: i8 = 8;
@@ -23,7 +23,7 @@ const CARD_WIDTH: usize = 7;
 const CARD_HEIGHT: usize = 5;
 const TABLEAU_VERTICAL_OFFSET: usize = 2;
 
-#[derive(Copy, Clone)]
+#[derive(Default, Copy, Clone)]
 struct Card {
     rank: i8,
     suit: i8
@@ -74,14 +74,14 @@ impl std::fmt::Display for Card {
 }
 
 struct Board {
-    field: [[Option<Card>; DECK_SIZE as usize]; (SUITS + FREE_CELLS + TABLEAU_SIZE) as usize],
+    field: [[Card; DECK_SIZE as usize]; (SUITS + FREE_CELLS + TABLEAU_SIZE) as usize],
     field_lengths: [usize; (SUITS + FREE_CELLS + TABLEAU_SIZE) as usize]
 }
 
 impl Board {
     fn new(rng: &mut rand::rngs::ThreadRng) -> Board {
         let mut board = Board {
-            field: [[None; DECK_SIZE as usize]; (SUITS + FREE_CELLS + TABLEAU_SIZE) as usize],
+            field: [[Card::default(); DECK_SIZE as usize]; (SUITS + FREE_CELLS + TABLEAU_SIZE) as usize],
             field_lengths: [0; (SUITS + FREE_CELLS + TABLEAU_SIZE) as usize]
         };
 
@@ -103,7 +103,7 @@ impl Board {
 
     fn put_on_tableau(&mut self, c: Card, tableau_column: usize) {
         let field_column = tableau_column + (SUITS + FREE_CELLS) as usize;
-        self.field[field_column][self.field_lengths[field_column]] = Some(c);
+        self.field[field_column][self.field_lengths[field_column]] = c;
         self.field_lengths[field_column] += 1;
     }
 }
@@ -144,14 +144,7 @@ impl Game {
 
         for (x, &stack) in self.board.field[(SUITS + FREE_CELLS) as usize ..].iter().enumerate() {
             for (y, &card) in stack.iter().enumerate() {
-                match card {
-                    Some(_) => {
-                        Game::print_card_at_coord(out, x * CARD_WIDTH + 1, y * TABLEAU_VERTICAL_OFFSET + CARD_HEIGHT + 1, card, (self.highlighted_card as usize == x + (SUITS + FREE_CELLS) as usize) && y == self.board.field_lengths[x + (SUITS + FREE_CELLS) as usize] - 1, (self.selected_card as usize == x + (SUITS + FREE_CELLS) as usize) && y == self.board.field_lengths[x + (SUITS + FREE_CELLS) as usize] - 1);
-                    }
-                    None => {
-
-                    }
-                }
+                Game::print_card_at_coord(out, x * CARD_WIDTH + 1, y * TABLEAU_VERTICAL_OFFSET + CARD_HEIGHT + 1, card, (self.highlighted_card as usize == x + (SUITS + FREE_CELLS) as usize) && y == self.board.field_lengths[x + (SUITS + FREE_CELLS) as usize] - 1, (self.selected_card as usize == x + (SUITS + FREE_CELLS) as usize) && y == self.board.field_lengths[x + (SUITS + FREE_CELLS) as usize] - 1);
             }
         }
 
@@ -166,9 +159,10 @@ impl Game {
         let _ = out.flush();
     }
 
-    fn print_card_at_coord(mut out: &Stdout, x: usize, y: usize, card: Option<Card>, highlighted: bool, selected: bool) {
-        let card_suit_rank_str = match card {
-            Some(card) => format!("{}{}", match card.rank {
+    fn print_card_at_coord(mut out: &Stdout, x: usize, y: usize, card: Card, highlighted: bool, selected: bool) {
+        let card_suit_rank_str =
+            format!("{}{}", match card.rank {
+                0 => " ",
                 1 => "A",
                 2 => "2",
                 3 => "3",
@@ -182,16 +176,15 @@ impl Game {
                 11 => "J",
                 12 => "Q",
                 13 => "K",
-                _ => "X"
+                _ => "e"
             }, match card.suit {
+                0 => " ",
                 HEARTS => "♠",
                 CLUBS => "♥",
                 DIAMONDS => "♦",
                 SPADES => "♣",
-                _ => "X"
-            }),
-            None => "  ".to_string()
-        };
+                _ => "e"
+            });
 
         let card_display_str;
         if selected {
@@ -218,21 +211,15 @@ impl Game {
             if highlighted {
                 let _= out.queue(style::SetAttribute(style::Attribute::Reverse));
             }
-            match card {
-                Some(c) => match c.suit {
-                    HEARTS | DIAMONDS => {
-                        // Print red card
-                        let _ = out.queue(style::SetForegroundColor(style::Color::Red));
-                        print!("{}", line);
-                        let _ = out.queue(style::ResetColor);
-                    }
-                    _ => {
-                        // Print black card
-                        print!("{}", line);
-                    }
+            match card.suit {
+                HEARTS | DIAMONDS => {
+                    // Print red card
+                    let _ = out.queue(style::SetForegroundColor(style::Color::Red));
+                    print!("{}", line);
+                    let _ = out.queue(style::ResetColor);
                 }
-                None => {
-                    // Print "placeholder" card
+                _ => {
+                    // Print black or placeholder card
                     print!("{}", line);
                 }
             }
@@ -275,44 +262,24 @@ impl Game {
         return false;
     }
     fn move_is_valid(&self, from: i8, to: i8) -> bool {
-        let from_top_card_op = if self.board.field_lengths[from as usize] > 0 {self.board.field[from as usize][self.board.field_lengths[from as usize] - 1]} else {None};
-        let to_top_card_op = if self.board.field_lengths[to as usize] > 0 {self.board.field[to as usize][self.board.field_lengths[to as usize] - 1]} else {None};
-        match from_top_card_op {
-            Some(from_top_card) => {
-                if from < SUITS {
-                    // Foundation case
-                    match to_top_card_op {
-                        Some(to_top_card) => {
-                            return from_top_card.rank == to_top_card.rank + 1;
-                        }
-                        None => {
-                            return from_top_card.rank == 1;
-                        }
-                    }
-                } else if SUITS < from && from < SUITS + FREE_CELLS {
-                    // Free cell case
-                    match to_top_card_op {
-                        Some(to_top_card) => {
-                            return false;
-                        }
-                        None => {
-                            return true;
-                        }
-                    }
-                } else if SUITS + FREE_CELLS < from && from < SUITS + FREE_CELLS + TABLEAU_SIZE {
-                    // Tableau case
-                    match to_top_card_op {
-                        Some(to_top_card) => {
-                            return from_top_card.rank == to_top_card.rank - 1 && Game::are_opposite_colors(from_top_card, to_top_card);
-                        }
-                        None => {
-                            return true;
-                        }
-                    }
-                }
+        let from_top_card = if self.board.field_lengths[from as usize] > 0 {self.board.field[from as usize][self.board.field_lengths[from as usize] - 1]} else {Card::default()};
+        let to_top_card = if self.board.field_lengths[to as usize] > 0 {self.board.field[to as usize][self.board.field_lengths[to as usize] - 1]} else {Card::default()};
+        if from < SUITS {
+            // Foundation case
+            if to_top_card.rank != 0 {
+                    return from_top_card.rank == to_top_card.rank + 1;
+            } else {
+                    return from_top_card.rank == 1;
             }
-            None => {
-                return false;
+        } else if SUITS < from && from < SUITS + FREE_CELLS {
+            // Free cell case
+            return to_top_card.rank == 0;
+        } else if SUITS + FREE_CELLS < from && from < SUITS + FREE_CELLS + TABLEAU_SIZE {
+            // Tableau case
+            if to_top_card.rank != 0 {
+                return from_top_card.rank == to_top_card.rank - 1 && Game::are_opposite_colors(from_top_card, to_top_card);
+            } else {
+                return true;
             }
         }
         return false;
