@@ -1,7 +1,7 @@
 use std::io::{stdout, Stdout, Write};
 
 use crossterm::{
-    cursor, event::{self, Event, KeyCode, KeyEvent}, execute, style::{self, Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor}, terminal::{size, Clear, ClearType, ScrollUp, SetSize}, ExecutableCommand
+    cursor, event::{self, Event, KeyCode, KeyEvent}, execute, style::{self, Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor}, terminal::{size, Clear, ClearType, ScrollUp, SetSize}, ExecutableCommand, QueueableCommand
 };
 
 const RANKS: i8 = 13;
@@ -18,6 +18,7 @@ const TABLEAU_SIZE: i8 = 8;
 
 const TERM_WIDTH: usize = 80;
 const TERM_HEIGHT: usize = 24;
+
 const CARD_WIDTH: usize = 7;
 const CARD_HEIGHT: usize = 5;
 const TABLEAU_VERTICAL_OFFSET: usize = 2;
@@ -122,17 +123,21 @@ impl Game {
         };
         game
     }
-    fn print(&self, out: &Stdout) {
+    fn print(&self, mut out: &Stdout) {
+        // Clear
+
+        let _ = out.queue(Clear(ClearType::All));
+        
         // Print foundations
 
         for (x, &card) in self.board.field[0..SUITS as usize].iter().enumerate() {
-            Game::print_card_at_coord(&out, x * CARD_WIDTH, 1, card[self.board.field_lengths[x]], self.highlighted_card as usize == x);
+            Game::print_card_at_coord(out, x * CARD_WIDTH, 1, card[self.board.field_lengths[x]], self.highlighted_card as usize == x, self.selected_card as usize == x);
         }
 
         // Print freecells
 
         for (x, &card) in self.board.field[SUITS as usize .. (SUITS + FREE_CELLS) as usize].iter().enumerate() {
-            Game::print_card_at_coord(&out, SUITS as usize * CARD_WIDTH + x * CARD_WIDTH + 2, 1, card[self.board.field_lengths[x + SUITS as usize]], self.highlighted_card as usize == x + SUITS as usize);
+            Game::print_card_at_coord(out, SUITS as usize * CARD_WIDTH + x * CARD_WIDTH + 2, 1, card[self.board.field_lengths[x + SUITS as usize]], self.highlighted_card as usize == x + SUITS as usize, self.selected_card as usize == x + SUITS as usize);
         }
 
         // Print tableau
@@ -141,7 +146,7 @@ impl Game {
             for (y, &card) in column.iter().enumerate() {
                 match card {
                     Some(_) => {
-                        Game::print_card_at_coord(&out, x * CARD_WIDTH + 1, y * TABLEAU_VERTICAL_OFFSET + CARD_HEIGHT + 2, card, (self.highlighted_card as usize == x + (SUITS + FREE_CELLS) as usize) && y == self.board.field_lengths[x + (SUITS + FREE_CELLS) as usize] - 1);
+                        Game::print_card_at_coord(out, x * CARD_WIDTH + 1, y * TABLEAU_VERTICAL_OFFSET + CARD_HEIGHT + 1, card, (self.highlighted_card as usize == x + (SUITS + FREE_CELLS) as usize) && y == self.board.field_lengths[x + (SUITS + FREE_CELLS) as usize] - 1, (self.selected_card as usize == x + (SUITS + FREE_CELLS) as usize) && y == self.board.field_lengths[x + (SUITS + FREE_CELLS) as usize] - 1);
                     }
                     None => {
 
@@ -151,16 +156,17 @@ impl Game {
         }
 
         // Print title bar
-        let _ = stdout().execute(cursor::MoveTo(0, 0));
-        println!("--- Rusty FreeCell ---------------------------------------");
+        let _ = out.queue(cursor::MoveTo(0, 0));
+        print!("--- Rusty FreeCell ---------------------------------------");
 
         // Print bottom bar
-        let _ = stdout().execute(cursor::MoveTo(0, TERM_HEIGHT as u16));
-        println!("--- (q)uit -----------------------------------------------");
+        let _ = out.queue(cursor::MoveTo(0, TERM_HEIGHT as u16));
+        print!("--- (q)uit -----------------------------------------------");
+
+        let _ = out.flush();
     }
 
-    fn print_card_at_coord(out: &Stdout, x: usize, y: usize, card: Option<Card>, highlighted: bool) {
-        let mut stdout = stdout();
+    fn print_card_at_coord(mut out: &Stdout, x: usize, y: usize, card: Option<Card>, highlighted: bool, selected: bool) {
         let card_suit_rank_str = match card {
             Some(card) => format!("{}{}", match card.rank {
                 1 => "1",
@@ -188,15 +194,15 @@ impl Game {
         };
 
         let card_display_str;
-        // if highlighted {
-        //     card_display_str= format!("\
-        //         ╭─────╮\n\
-        //         │ {: <3} │\n\
-        //         │     │\n\
-        //         │█████│\n\
-        //         ╰─────╯\n",
-        //         card_suit_rank_str);
-        // } else {
+        if selected {
+            card_display_str= format!("\
+                ╭─────╮\n\
+                │ {: <3} │\n\
+                │     │\n\
+                │  △  │\n\
+                ╰─────╯\n",
+                card_suit_rank_str);
+        } else {
             card_display_str= format!("\
             ╭─────╮\n\
             │ {: <3} │\n\
@@ -204,33 +210,34 @@ impl Game {
             │     │\n\
             ╰─────╯\n",
             card_suit_rank_str);
-        // }
+        }
 
         for (d, line) in card_display_str.lines().enumerate() {
-            let _ = stdout.execute(cursor::MoveTo(x as u16, y as u16 + d as u16));
+            if y+d >= TERM_HEIGHT {break};
+            let _ = out.queue(cursor::MoveTo(x as u16, y as u16 + d as u16));
             if highlighted {
-                let _= stdout.execute(style::SetAttribute(style::Attribute::Reverse));
+                let _= out.queue(style::SetAttribute(style::Attribute::Reverse));
             }
             match card {
                 Some(c) => match c.suit {
                     HEARTS | DIAMONDS => {
                         // Print red card
-                        let _ = stdout.execute(style::SetForegroundColor(style::Color::Red));
-                        println!("{}", line);
-                        let _ = stdout.execute(style::ResetColor);
+                        let _ = out.queue(style::SetForegroundColor(style::Color::Red));
+                        print!("{}", line);
+                        let _ = out.queue(style::ResetColor);
                     }
                     _ => {
                         // Print black card
-                        println!("{}", line);
+                        print!("{}", line);
                     }
                 }
                 None => {
                     // Print "placeholder" card
-                    println!("{}", line);
+                    print!("{}", line);
                 }
             }
             if highlighted {
-                let _= stdout.execute(style::SetAttribute(style::Attribute::NoReverse));
+                let _= out.queue(style::SetAttribute(style::Attribute::NoReverse));
             }
         }
     }
@@ -263,7 +270,11 @@ impl Game {
         }
     }
     fn execute_move(&mut self, from: i8, to: i8) {
-
+        self.board.field[to as usize][self.board.field_lengths[to as usize]] = self.board.field[from as usize][self.board.field_lengths[from as usize] - 1];
+        self.board.field[from as usize][self.board.field_lengths[from as usize] - 1] = Default::default();
+        self.board.field_lengths[from as usize] -= 1;
+        self.board.field_lengths[to as usize] += 1;
+        self.selected_card = -1;
     }
 }
 
@@ -271,8 +282,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     
     // Prepare terminal
     crossterm::terminal::enable_raw_mode()?;
-    let _ = stdout().execute(cursor::Hide);
     let mut stdout = stdout();
+    let _ = stdout.execute(cursor::Hide);
     stdout.execute(Clear(ClearType::All))?;
 
     // stdout.execute(SetForegroundColor(Color::Blue))?;
