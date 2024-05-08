@@ -1,4 +1,4 @@
-use std::io::{stdout, Stdout, Write};
+use std::{cmp, io::{stdout, Stdout, Write}};
 
 use crossterm::{
     cursor, event::{self, Event, KeyCode, KeyEvent}, execute, style::{self, Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor}, terminal::{size, Clear, ClearType, ScrollUp, SetSize}, ExecutableCommand, QueueableCommand
@@ -124,32 +124,28 @@ impl Game {
         game
     }
     fn print(&self, mut out: &Stdout) {
-        // Clear
-
         let _ = out.queue(Clear(ClearType::All));
-        
-        // Print foundations
 
-        for (x, &stack) in self.board.field[0..SUITS as usize].iter().enumerate() {
-            Game::print_card_at_coord(out, x * CARD_WIDTH, 1, stack[self.board.field_lengths[x]], self.highlighted_card as usize == x, self.selected_card as usize == x);
-        }
-
-        // Print freecells
-
-        for (x, &stack) in self.board.field[SUITS as usize .. (SUITS + FREE_CELLS) as usize].iter().enumerate() {
-            Game::print_card_at_coord(out, SUITS as usize * CARD_WIDTH + x * CARD_WIDTH + 2, 1, stack[self.board.field_lengths[x + SUITS as usize]], self.highlighted_card as usize == x + SUITS as usize, self.selected_card as usize == x + SUITS as usize);
-        }
-
-        // Print tableau
-
-        for (x, &stack) in self.board.field[(SUITS + FREE_CELLS) as usize ..].iter().enumerate() {
-            for (y, &card) in stack.iter().enumerate() {
-                // if no card there, continue
-                if card.rank == 0 {continue;};
-                Game::print_card_at_coord(out, x * CARD_WIDTH + 1, y * TABLEAU_VERTICAL_OFFSET + CARD_HEIGHT + 1, card, (self.highlighted_card as usize == x + (SUITS + FREE_CELLS) as usize) && y == self.board.field_lengths[x + (SUITS + FREE_CELLS) as usize] - 1, (self.selected_card as usize == x + (SUITS + FREE_CELLS) as usize) && y == self.board.field_lengths[x + (SUITS + FREE_CELLS) as usize] - 1);
+        for i in 0..(SUITS+FREE_CELLS+TABLEAU_SIZE) as usize {
+            let stack = self.board.field[i];
+            let stack_size = self.board.field_lengths[i];
+            let top_card = self.board.field[i][if stack_size == 0 {0} else {stack_size - 1}];
+            if i < SUITS as usize {
+                // Print foundation
+                Game::print_card_at_coord(out, i * CARD_WIDTH, 1, top_card, self.highlighted_card as usize == i, self.selected_card as usize == i);
+            } else if i < (SUITS + FREE_CELLS) as usize {
+                // Print free cell
+                Game::print_card_at_coord(out, i * CARD_WIDTH + 2, 1, top_card, self.highlighted_card as usize == i as usize, self.selected_card as usize == i as usize);
+            } else if i < (SUITS + FREE_CELLS + TABLEAU_SIZE) as usize {
+                // Print tableau
+                for (y, &card) in stack.iter().enumerate() {
+                    // if no card there, continue
+                    if card.rank == 0 {continue;};
+                    Game::print_card_at_coord(out, (i - (SUITS + FREE_CELLS) as usize) * CARD_WIDTH + 1, y * TABLEAU_VERTICAL_OFFSET + CARD_HEIGHT + 1, card, (self.highlighted_card as usize == i as usize) && y == self.board.field_lengths[i as usize] - 1, (self.selected_card as usize == i as usize) && y == self.board.field_lengths[i as usize] - 1);
+                }
             }
         }
-
+        
         // Print title bar
         let _ = out.queue(cursor::MoveTo(0, 0));
         print!("--- Rusty FreeCell ---------------------------------------");
@@ -266,17 +262,17 @@ impl Game {
     fn move_is_valid(&self, from: i8, to: i8) -> bool {
         let from_top_card = if self.board.field_lengths[from as usize] > 0 {self.board.field[from as usize][self.board.field_lengths[from as usize] - 1]} else {Card::default()};
         let to_top_card = if self.board.field_lengths[to as usize] > 0 {self.board.field[to as usize][self.board.field_lengths[to as usize] - 1]} else {Card::default()};
-        if from < SUITS {
+        if to < SUITS {
             // Foundation case
             if to_top_card.rank != 0 {
                     return from_top_card.rank == to_top_card.rank + 1;
             } else {
                     return from_top_card.rank == 1;
             }
-        } else if SUITS < from && from < SUITS + FREE_CELLS {
+        } else if to < SUITS + FREE_CELLS {
             // Free cell case
             return to_top_card.rank == 0;
-        } else if SUITS + FREE_CELLS < from && from < SUITS + FREE_CELLS + TABLEAU_SIZE {
+        } else if to < SUITS + FREE_CELLS + TABLEAU_SIZE {
             // Tableau case
             if to_top_card.rank != 0 {
                 return from_top_card.rank == to_top_card.rank - 1 && Game::are_opposite_colors(from_top_card, to_top_card);
@@ -294,9 +290,9 @@ impl Game {
         self.selected_card = -1;
     }
     fn try_execute_move(&mut self, from: i8, to: i8) {
-        //if self.move_is_valid(from, to) {
+        if self.move_is_valid(from, to) {
             self.execute_move(from, to);
-        //}
+        }
     }
 }
 
