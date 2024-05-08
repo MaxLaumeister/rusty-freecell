@@ -1,20 +1,21 @@
 use std::{cmp, io::{stdout, Stdout, Write}};
 
+use circular_buffer::CircularBuffer;
 use crossterm::{
     cursor, event::{self, Event, KeyCode, KeyEvent}, execute, style::{self, Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor}, terminal::{size, Clear, ClearType, ScrollUp, SetSize}, ExecutableCommand, QueueableCommand
 };
 
-const RANKS: i8 = 13;
-const SUITS: i8 = 4;
-const DECK_SIZE: i8 = RANKS* SUITS;
+const RANKS: usize = 13;
+const SUITS: usize = 4;
+const DECK_SIZE: usize = RANKS* SUITS;
 
 const HEARTS: i8 = 1;
 const CLUBS: i8 = 2;
 const DIAMONDS: i8 = 3;
 const SPADES: i8 = 4;
 
-const FREE_CELLS: i8 = 4;
-const TABLEAU_SIZE: i8 = 8;
+const FREE_CELLS: usize = 4;
+const TABLEAU_SIZE: usize = 8;
 
 const TERM_WIDTH: usize = 80;
 const TERM_HEIGHT: usize = 24;
@@ -22,6 +23,8 @@ const TERM_HEIGHT: usize = 24;
 const CARD_WIDTH: usize = 7;
 const CARD_HEIGHT: usize = 5;
 const TABLEAU_VERTICAL_OFFSET: usize = 2;
+
+const UNDO_LEVELS: usize = 1000;
 
 #[derive(Default, Copy, Clone)]
 struct Card {
@@ -33,12 +36,18 @@ struct Deck {
     cards: [Card; DECK_SIZE as usize]
 }
 
+#[derive(Default, Copy, Clone)]
+struct Move {
+    from: usize,
+    to: usize
+}
+
 impl Deck {
     fn standard() -> Deck {
         let mut deck = Deck {cards: [Card {rank: 0, suit: 0}; DECK_SIZE as usize]};
         for r in 0..RANKS {
             for s in 0..SUITS {
-                deck.cards[(s*RANKS+r) as usize] = Card{rank: r+1, suit: s+1};
+                deck.cards[(s*RANKS+r) as usize] = Card{rank: (r+1) as i8, suit: (s+1) as i8};
             }
         }
         deck
@@ -110,8 +119,9 @@ impl Board {
 
 struct Game {
     board: Board,
-    highlighted_card: i8,
-    selected_card: i8
+    highlighted_card: usize,
+    selected_card_opt: Option<usize>,
+    undo_history: CircularBuffer::<UNDO_LEVELS, Move>
 }
 
 impl Game {
@@ -119,7 +129,8 @@ impl Game {
         let game = Game {
             board: Board::new(rng),
             highlighted_card: SUITS + FREE_CELLS,
-            selected_card: -1
+            selected_card_opt: None,
+            undo_history: CircularBuffer::new()
         };
         game
     }
@@ -132,16 +143,16 @@ impl Game {
             let top_card = self.board.field[i][if stack_size == 0 {0} else {stack_size - 1}];
             if i < SUITS as usize {
                 // Print foundation
-                Game::print_card_at_coord(out, i * CARD_WIDTH, 1, top_card, self.highlighted_card as usize == i, self.selected_card as usize == i);
+                Game::print_card_at_coord(out, i * CARD_WIDTH, 1, top_card, self.highlighted_card as usize == i, self.selected_card_opt == Some(i));
             } else if i < (SUITS + FREE_CELLS) as usize {
                 // Print free cell
-                Game::print_card_at_coord(out, i * CARD_WIDTH + 2, 1, top_card, self.highlighted_card as usize == i as usize, self.selected_card as usize == i as usize);
+                Game::print_card_at_coord(out, i * CARD_WIDTH + 2, 1, top_card, self.highlighted_card as usize == i as usize, self.selected_card_opt == Some(i));
             } else if i < (SUITS + FREE_CELLS + TABLEAU_SIZE) as usize {
                 // Print tableau
                 for (y, &card) in stack.iter().enumerate() {
                     // if no card there, continue
                     if card.rank == 0 {continue;};
-                    Game::print_card_at_coord(out, (i - (SUITS + FREE_CELLS) as usize) * CARD_WIDTH + 1, y * TABLEAU_VERTICAL_OFFSET + CARD_HEIGHT + 1, card, (self.highlighted_card as usize == i as usize) && y == self.board.field_lengths[i as usize] - 1, (self.selected_card as usize == i as usize) && y == self.board.field_lengths[i as usize] - 1);
+                    Game::print_card_at_coord(out, (i - (SUITS + FREE_CELLS) as usize) * CARD_WIDTH + 1, y * TABLEAU_VERTICAL_OFFSET + CARD_HEIGHT + 1, card, (self.highlighted_card as usize == i as usize) && y == self.board.field_lengths[i as usize] - 1, (self.selected_card_opt == Some(i)) && y == self.board.field_lengths[i as usize] - 1);
                 }
             }
         }
@@ -152,7 +163,7 @@ impl Game {
 
         // Print bottom bar
         let _ = out.queue(cursor::MoveTo(0, TERM_HEIGHT as u16));
-        print!("--- (q)uit -----------------------------------------------");
+        print!("--- (New Game: ctrl-n) - (Undo: z) - (Quit: q) -----------");
 
         let _ = out.flush();
     }
@@ -243,15 +254,22 @@ impl Game {
         }
     }
     fn handle_card_press(&mut self) {
-        if self.selected_card == -1 {
+        if self.selected_card_opt == None {
             // Select a card
-            self.selected_card = self.highlighted_card;
-        } else if self.highlighted_card == self.selected_card {
+            self.selected_card_opt = Some(self.highlighted_card);
+        } else if Some(self.highlighted_card) == self.selected_card_opt {
             // Deselect a card
-            self.selected_card = -1;
+            self.selected_card_opt = None;
         } else {
             // Execute a move
-            self.try_execute_move(self.selected_card, self.highlighted_card);
+            match self.selected_card_opt {
+                Some(selected_card) => {
+                    self.player_try_execute_move(selected_card, self.highlighted_card);
+                }
+                None => {
+
+                }
+            }
         }
     }
     fn are_opposite_colors(card1: Card, card2: Card) -> bool {
@@ -259,7 +277,7 @@ impl Game {
         if (card1.suit == SPADES || card1.suit == CLUBS) {return card2.suit == HEARTS || card2.suit == DIAMONDS};
         return false;
     }
-    fn move_is_valid(&self, from: i8, to: i8) -> bool {
+    fn move_is_valid(&self, from: usize, to: usize) -> bool {
         let from_top_card = if self.board.field_lengths[from as usize] > 0 {self.board.field[from as usize][self.board.field_lengths[from as usize] - 1]} else {Card::default()};
         let to_top_card = if self.board.field_lengths[to as usize] > 0 {self.board.field[to as usize][self.board.field_lengths[to as usize] - 1]} else {Card::default()};
         if to < SUITS {
@@ -282,16 +300,32 @@ impl Game {
         }
         return false;
     }
-    fn execute_move (&mut self, from: i8, to: i8) {
+    fn execute_move (&mut self, from: usize, to: usize) {
+        // Execute the move
         self.board.field[to as usize][self.board.field_lengths[to as usize]] = self.board.field[from as usize][self.board.field_lengths[from as usize] - 1];
         self.board.field[from as usize][self.board.field_lengths[from as usize] - 1] = Default::default();
         self.board.field_lengths[from as usize] -= 1;
         self.board.field_lengths[to as usize] += 1;
-        self.selected_card = -1;
+        self.selected_card_opt = None;
     }
-    fn try_execute_move(&mut self, from: i8, to: i8) {
+    fn player_try_execute_move(&mut self, from: usize, to: usize) {
         if self.move_is_valid(from, to) {
+            // Execute move, add to undo history
             self.execute_move(from, to);
+            self.undo_history.push_back(Move{from: from, to: to});
+
+        }
+    }
+    fn perform_undo(&mut self) {
+        let last_move_opt = self.undo_history.pop_back();
+        match last_move_opt {
+            Some(last_move) => {
+                // Perform move in reverse, without checking if it follows the rules
+                self.execute_move(last_move.to, last_move.from);
+            }
+            None => {
+                // History empty
+            }
         }
     }
 }
@@ -324,11 +358,26 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 KeyEvent {code: KeyCode::Left, modifiers: event::KeyModifiers::NONE, kind: _, state: _} => {
                     game.move_cursor_left();
                 },
+                KeyEvent {code: KeyCode::Char('a'), modifiers: event::KeyModifiers::NONE, kind: _, state: _} => {
+                    game.move_cursor_left();
+                },
                 KeyEvent {code: KeyCode::Right, modifiers: event::KeyModifiers::NONE, kind: _, state: _} => {
+                    game.move_cursor_right();
+                },
+                KeyEvent {code: KeyCode::Char('d'), modifiers: event::KeyModifiers::NONE, kind: _, state: _} => {
                     game.move_cursor_right();
                 },
                 KeyEvent {code: KeyCode::Char(' '), modifiers: event::KeyModifiers::NONE, kind: _, state: _} => {
                     game.handle_card_press();
+                },
+                KeyEvent {code: KeyCode::Enter, modifiers: event::KeyModifiers::NONE, kind: _, state: _} => {
+                    game.handle_card_press();
+                },
+                KeyEvent {code: KeyCode::Char('z'), modifiers: event::KeyModifiers::NONE, kind: _, state: _} => {
+                    game.perform_undo();
+                },
+                KeyEvent {code: KeyCode::Char('n'), modifiers: event::KeyModifiers::CONTROL, kind: _, state: _} => {
+                    game = Game::new(&mut rng);
                 },
                 _ => {
                     
