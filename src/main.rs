@@ -1,7 +1,7 @@
 use std::io::{stdout, Stdout, Write};
 
 use crossterm::{
-    cursor, event::{self, Event, KeyCode, KeyEvent}, execute, style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor}, terminal::{size, Clear, ClearType, ScrollUp, SetSize}, ExecutableCommand
+    cursor, event::{self, Event, KeyCode, KeyEvent}, execute, style::{self, Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor}, terminal::{size, Clear, ClearType, ScrollUp, SetSize}, ExecutableCommand
 };
 
 const RANKS: i8 = 13;
@@ -152,11 +152,15 @@ impl Game {
 
         // Print title bar
         let _ = stdout().execute(cursor::MoveTo(0, 0));
-        println!("Rusty FreeCell");
+        println!("--- Rusty FreeCell ---------------------------------------");
+
+        // Print bottom bar
+        let _ = stdout().execute(cursor::MoveTo(0, TERM_HEIGHT as u16));
+        println!("--- (q)uit -----------------------------------------------");
     }
 
     fn print_card_at_coord(out: &Stdout, x: usize, y: usize, card: Option<Card>, highlighted: bool) {
-
+        let mut stdout = stdout();
         let card_str = match card {
             Some(card) => format!("{}{}", match card.rank {
                 1 => "1",
@@ -174,13 +178,13 @@ impl Game {
                 13 => "K",
                 _ => "X"
             }, match card.suit {
-                HEARTS => "h",
-                CLUBS => "c",
-                DIAMONDS => "d",
-                SPADES => "s",
+                HEARTS => "♠",
+                CLUBS => "♥",
+                DIAMONDS => "♦",
+                SPADES => "♣",
                 _ => "X"
             }),
-            None => "--".to_string()
+            None => "  ".to_string()
         };
         let pl_str;
         if highlighted {
@@ -199,8 +203,25 @@ impl Game {
             \x20----- \n", card_str);
         }
         for (d, line) in pl_str.lines().enumerate() {
-            let _ = stdout().execute(cursor::MoveTo(x as u16, y as u16 + d as u16));
-            println!("{}", line);
+            let _ = stdout.execute(cursor::MoveTo(x as u16, y as u16 + d as u16));
+            match card {
+                Some(c) => match c.suit {
+                    HEARTS | DIAMONDS => {
+                        // Print red card
+                        let _ = stdout.execute(style::SetForegroundColor(style::Color::Red));
+                        println!("{}", line);
+                        let _ = stdout.execute(style::ResetColor);
+                    }
+                    _ => {
+                        // Print black card
+                        println!("{}", line);
+                    }
+                }
+                None => {
+                    // Print "placeholder" card
+                    println!("{}", line);
+                }
+            }
         }
     }
 
