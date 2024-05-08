@@ -186,24 +186,20 @@ impl Game {
             }),
             None => "  ".to_string()
         };
-        let pl_str;
-        if highlighted {
-            pl_str = format!("\
-            \x20OOOOO \n\
-               O {: <3} O\n\
-               O     O\n\
-               O     O\n\
-            \x20OOOOO \n", card_str);
-        } else {
-            pl_str = format!("\
+
+        let pl_str= format!("\
             \x20----- \n\
                | {: <3} |\n\
                |     |\n\
                |     |\n\
-            \x20----- \n", card_str);
-        }
+            \x20----- \n",
+            card_str);
+
         for (d, line) in pl_str.lines().enumerate() {
             let _ = stdout.execute(cursor::MoveTo(x as u16, y as u16 + d as u16));
+            if highlighted {
+                let _= stdout.execute(style::SetAttribute(style::Attribute::Reverse));
+            }
             match card {
                 Some(c) => match c.suit {
                     HEARTS | DIAMONDS => {
@@ -221,6 +217,9 @@ impl Game {
                     // Print "placeholder" card
                     println!("{}", line);
                 }
+            }
+            if highlighted {
+                let _= stdout.execute(style::SetAttribute(style::Attribute::NoReverse));
             }
         }
     }
