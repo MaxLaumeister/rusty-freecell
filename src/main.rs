@@ -244,6 +244,15 @@ impl Game {
         } else {
             self.highlighted_card -= 1;
         }
+
+        match self.selected_card_opt {
+            Some(selected_card) => {
+                while !self.move_is_valid(selected_card, self.highlighted_card) {
+                    self.move_cursor_left();
+                }
+            }
+            None => ()
+        }
     }
 
     fn move_cursor_right(&mut self) {
@@ -251,6 +260,15 @@ impl Game {
             self.highlighted_card = 0;
         } else {
             self.highlighted_card += 1;
+        }
+
+        match self.selected_card_opt {
+            Some(selected_card) => {
+                while !self.move_is_valid(selected_card, self.highlighted_card) {
+                    self.move_cursor_right();
+                }
+            }
+            None => ()
         }
     }
     fn handle_card_press(&mut self) {
@@ -273,13 +291,14 @@ impl Game {
         }
     }
     fn are_opposite_colors(card1: Card, card2: Card) -> bool {
-        if (card1.suit == HEARTS || card1.suit == DIAMONDS) {return card2.suit == SPADES || card2.suit == CLUBS};
-        if (card1.suit == SPADES || card1.suit == CLUBS) {return card2.suit == HEARTS || card2.suit == DIAMONDS};
+        if card1.suit == HEARTS || card1.suit == DIAMONDS {return card2.suit == SPADES || card2.suit == CLUBS};
+        if card1.suit == SPADES || card1.suit == CLUBS {return card2.suit == HEARTS || card2.suit == DIAMONDS};
         return false;
     }
     fn move_is_valid(&self, from: usize, to: usize) -> bool {
         let from_top_card = if self.board.field_lengths[from as usize] > 0 {self.board.field[from as usize][self.board.field_lengths[from as usize] - 1]} else {Card::default()};
         let to_top_card = if self.board.field_lengths[to as usize] > 0 {self.board.field[to as usize][self.board.field_lengths[to as usize] - 1]} else {Card::default()};
+        if from == to {return true;};
         if to < SUITS {
             // Foundation case
             if to_top_card.rank != 0 {
