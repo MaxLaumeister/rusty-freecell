@@ -1,8 +1,15 @@
+// #TODO eliminate terminal flicker
+// #TODO error handling
+// #TODO moving multiple cards at once (shortcut)
+// #TODO move count
+// #TODO win screen
+// #TODO decorate foundations with suits
+
 use std::{cmp, io::{stdout, Stdout, Write}};
 
 use circular_buffer::CircularBuffer;
 use crossterm::{
-    cursor, event::{self, Event, KeyCode, KeyEvent}, execute, style::{self, Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor}, terminal::{size, Clear, ClearType, ScrollUp, SetSize}, ExecutableCommand, QueueableCommand
+    cursor, event::{self, Event, KeyCode, KeyEvent}, execute, style::{self, Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor}, terminal::{size, BeginSynchronizedUpdate, Clear, ClearType, EndSynchronizedUpdate, EnterAlternateScreen, LeaveAlternateScreen, ScrollUp, SetSize}, ExecutableCommand, QueueableCommand
 };
 
 const RANKS: usize = 13;
@@ -354,13 +361,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     // Prepare terminal
     crossterm::terminal::enable_raw_mode()?;
     let mut stdout = stdout();
-    let _ = stdout.execute(cursor::Hide);
+    stdout.execute(EnterAlternateScreen)?;
+    stdout.execute(cursor::Hide)?;
     stdout.execute(Clear(ClearType::All))?;
-
-    // stdout.execute(SetForegroundColor(Color::Blue))?;
-    // stdout.execute(SetBackgroundColor(Color::Red))?;
-    // stdout.execute(Print("Styled text here."))?;
-    // stdout.execute(ResetColor)?;
 
     // Create game
     let mut rng = rand::thread_rng();
@@ -415,6 +418,7 @@ fn cleanup() {
     let _ = stdout.execute(cursor::Show);
     let _ = crossterm::terminal::disable_raw_mode();
     let _ = stdout.execute(Clear(ClearType::All));
+    let _ = stdout.execute(LeaveAlternateScreen);
     println!();
 }
 
