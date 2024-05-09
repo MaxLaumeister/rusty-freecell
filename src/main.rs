@@ -1,11 +1,12 @@
 // #TODO eliminate terminal flicker
 // #TODO error handling
 // #TODO moving multiple cards at once (shortcut)
-// #TODO move count
+// #TODO X move count
 // #TODO win screen
 // #TODO decorate foundations with suits
 // #TODO condense top row representation when terminal is small, expand when large
 // #TODO refactor, ci, lint, publish
+// #TODO ? fix windows terminal behavior
 
 use std::{cmp, io::{stdout, Stdout, Write}};
 
@@ -130,7 +131,8 @@ struct Game {
     board: Board,
     highlighted_card: usize,
     selected_card_opt: Option<usize>,
-    undo_history: CircularBuffer::<UNDO_LEVELS, Move>
+    undo_history: CircularBuffer::<UNDO_LEVELS, Move>,
+    move_count: u32
 }
 
 impl Game {
@@ -139,7 +141,8 @@ impl Game {
             board: Board::new(rng),
             highlighted_card: SUITS + FREE_CELLS,
             selected_card_opt: None,
-            undo_history: CircularBuffer::new()
+            undo_history: CircularBuffer::new(),
+            move_count: 0
         };
         game
     }
@@ -169,6 +172,8 @@ impl Game {
         // Print title bar
         let _ = out.queue(cursor::MoveTo(0, 0));
         print!("--- Rusty FreeCell ---------------------------------------");
+        let _ = out.queue(cursor::MoveTo(40, 0));
+        print!(" Moves: {} ", self.move_count);
 
         // Print bottom bar
         let _ = out.queue(cursor::MoveTo(0, TERM_HEIGHT as u16));
@@ -340,8 +345,8 @@ impl Game {
         if self.move_is_valid(from, to) {
             // Execute move, add to undo history
             self.execute_move(from, to);
+            self.move_count += 1;
             self.undo_history.push_back(Move{from: from, to: to});
-
         }
     }
     fn perform_undo(&mut self) {
@@ -350,6 +355,7 @@ impl Game {
             Some(last_move) => {
                 // Perform move in reverse, without checking if it follows the rules
                 self.execute_move(last_move.to, last_move.from);
+                self.move_count -= 1;
             }
             None => {
                 // History empty
@@ -376,31 +382,31 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     loop {
         if let Event::Key(event) = event::read().expect("Failed to read line") {
             match event {
-                KeyEvent {code: KeyCode::Char('q'), modifiers: event::KeyModifiers::NONE, kind: _, state: _} => {
+                KeyEvent {code: KeyCode::Char('q'), modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
                     break
                 },
-                KeyEvent {code: KeyCode::Left, modifiers: event::KeyModifiers::NONE, kind: _, state: _} => {
+                KeyEvent {code: KeyCode::Left, modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
                     game.move_cursor_left();
                 },
-                KeyEvent {code: KeyCode::Char('a'), modifiers: event::KeyModifiers::NONE, kind: _, state: _} => {
+                KeyEvent {code: KeyCode::Char('a'), modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
                     game.move_cursor_left();
                 },
-                KeyEvent {code: KeyCode::Right, modifiers: event::KeyModifiers::NONE, kind: _, state: _} => {
+                KeyEvent {code: KeyCode::Right, modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
                     game.move_cursor_right();
                 },
-                KeyEvent {code: KeyCode::Char('d'), modifiers: event::KeyModifiers::NONE, kind: _, state: _} => {
+                KeyEvent {code: KeyCode::Char('d'), modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
                     game.move_cursor_right();
                 },
-                KeyEvent {code: KeyCode::Char(' '), modifiers: event::KeyModifiers::NONE, kind: _, state: _} => {
+                KeyEvent {code: KeyCode::Char(' '), modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
                     game.handle_card_press();
                 },
-                KeyEvent {code: KeyCode::Enter, modifiers: event::KeyModifiers::NONE, kind: _, state: _} => {
+                KeyEvent {code: KeyCode::Enter, modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
                     game.handle_card_press();
                 },
-                KeyEvent {code: KeyCode::Char('z'), modifiers: event::KeyModifiers::NONE, kind: _, state: _} => {
+                KeyEvent {code: KeyCode::Char('z'), modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
                     game.perform_undo();
                 },
-                KeyEvent {code: KeyCode::Char('n'), modifiers: event::KeyModifiers::CONTROL, kind: _, state: _} => {
+                KeyEvent {code: KeyCode::Char('n'), modifiers: event::KeyModifiers::CONTROL, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
                     game = Game::new(&mut rng);
                 },
                 _ => {
