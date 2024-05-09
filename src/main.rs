@@ -1,18 +1,21 @@
-// #TODO eliminate terminal flicker
-// #TODO error handling
-// #TODO moving multiple cards at once (shortcut)
+// #TODO   eliminate terminal flicker
+// #TODO   error handling
+// #TODO   moving multiple cards at once (shortcut)
 // #TODO X move count
-// #TODO win screen
-// #TODO decorate foundations with suits
-// #TODO condense top row representation when terminal is small, expand when large
-// #TODO refactor, ci, lint, publish
+// #TODO X implement winning screen
+// #TODO   check for win, set win variable
+// #TODO   decorate foundations with suits
+// #TODO   condense top row representation when terminal is small, expand when large
+// #TODO   refactor, ci, lint, publish
 // #TODO ? fix windows terminal behavior
+// #TODO   variable terminal size
+// #TODO   member visibility (modules)
 
 use std::{cmp, io::{stdout, Stdout, Write}};
 
 use circular_buffer::CircularBuffer;
 use crossterm::{
-    cursor, event::{self, Event, KeyCode, KeyEvent}, execute, style::{self, Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor}, terminal::{size, BeginSynchronizedUpdate, Clear, ClearType, EndSynchronizedUpdate, EnterAlternateScreen, LeaveAlternateScreen, ScrollUp, SetSize}, ExecutableCommand, QueueableCommand
+    cursor, event::{self, Event, KeyCode, KeyEvent}, execute, style::{self, Color, Print, ResetColor, SetAttribute, SetBackgroundColor, SetForegroundColor, SetStyle, Stylize}, terminal::{size, BeginSynchronizedUpdate, Clear, ClearType, EndSynchronizedUpdate, EnterAlternateScreen, LeaveAlternateScreen, ScrollUp, SetSize}, ExecutableCommand, QueueableCommand
 };
 
 const RANKS: usize = 13;
@@ -132,7 +135,8 @@ struct Game {
     highlighted_card: usize,
     selected_card_opt: Option<usize>,
     undo_history: CircularBuffer::<UNDO_LEVELS, Move>,
-    move_count: u32
+    move_count: u32,
+    won: bool
 }
 
 impl Game {
@@ -142,11 +146,12 @@ impl Game {
             highlighted_card: SUITS + FREE_CELLS,
             selected_card_opt: None,
             undo_history: CircularBuffer::new(),
-            move_count: 0
+            move_count: 0,
+            won: false
         };
         game
     }
-    fn print(&self, mut out: &Stdout) {
+    fn print_board(&self, out: &mut Stdout) {
         let _ = out.queue(Clear(ClearType::All));
 
         for i in 0..(SUITS+FREE_CELLS+TABLEAU_SIZE) as usize {
@@ -155,20 +160,22 @@ impl Game {
             let top_card = self.board.field[i][if stack_size == 0 {0} else {stack_size - 1}];
             if i < SUITS as usize {
                 // Print foundation
-                Game::print_card_at_coord(out, i * CARD_WIDTH, 1, top_card, self.highlighted_card as usize == i, self.selected_card_opt == Some(i));
+                Game::print_card_at_coord(out, i * CARD_WIDTH, 1, top_card, (self.highlighted_card as usize == i) && self.won != true, self.selected_card_opt == Some(i));
             } else if i < (SUITS + FREE_CELLS) as usize {
                 // Print free cell
-                Game::print_card_at_coord(out, i * CARD_WIDTH + 2, 1, top_card, self.highlighted_card as usize == i as usize, self.selected_card_opt == Some(i));
+                Game::print_card_at_coord(out, i * CARD_WIDTH + 2, 1, top_card, (self.highlighted_card as usize == i as usize)  && self.won != true, self.selected_card_opt == Some(i));
             } else if i < (SUITS + FREE_CELLS + TABLEAU_SIZE) as usize {
                 // Print tableau
                 for (y, &card) in stack.iter().enumerate() {
                     // if no card there, continue
                     if card.rank == 0 {continue;};
-                    Game::print_card_at_coord(out, (i - (SUITS + FREE_CELLS) as usize) * CARD_WIDTH + 1, y * TABLEAU_VERTICAL_OFFSET + CARD_HEIGHT + 1, card, (self.highlighted_card as usize == i as usize) && y == self.board.field_lengths[i as usize] - 1, (self.selected_card_opt == Some(i)) && y == self.board.field_lengths[i as usize] - 1);
+                    Game::print_card_at_coord(out, (i - (SUITS + FREE_CELLS) as usize) * CARD_WIDTH + 1, y * TABLEAU_VERTICAL_OFFSET + CARD_HEIGHT + 1, card, (self.highlighted_card as usize == i as usize) && y == self.board.field_lengths[i as usize] - 1 && self.won != true, (self.selected_card_opt == Some(i)) && y == self.board.field_lengths[i as usize] - 1);
                 }
             }
         }
-        
+    }
+
+    fn print_status_bars(&self, out: &mut Stdout) {
         // Print title bar
         let _ = out.queue(cursor::MoveTo(0, 0));
         print!("--- Rusty FreeCell ---------------------------------------");
@@ -178,11 +185,9 @@ impl Game {
         // Print bottom bar
         let _ = out.queue(cursor::MoveTo(0, TERM_HEIGHT as u16));
         print!("--- (New Game: ctrl-n) - (Undo: z) - (Quit: q) -----------");
-
-        let _ = out.flush();
     }
 
-    fn print_card_at_coord(mut out: &Stdout, x: usize, y: usize, card: Card, highlighted: bool, selected: bool) {
+    fn print_card_at_coord(out: &mut Stdout, x: usize, y: usize, card: Card, highlighted: bool, selected: bool) {
         let card_suit_rank_str =
             format!("{}{}", match card.rank {
                 0 => " ",
@@ -237,9 +242,7 @@ impl Game {
             match card.suit {
                 HEARTS | DIAMONDS => {
                     // Print red card
-                    let _ = out.queue(style::SetForegroundColor(style::Color::Red));
-                    print!("{}", line);
-                    let _ = out.queue(style::ResetColor);
+                    print!("{}", line.with(Color::Red));
                 }
                 _ => {
                     // Print black or placeholder card
@@ -249,6 +252,40 @@ impl Game {
             if highlighted {
                 let _= out.queue(style::SetAttribute(style::Attribute::NoReverse));
             }
+        }
+    }
+
+    fn print_win (&self, out: &mut Stdout) {
+        let win_message_width = 20;
+        let win_message_height = 4;
+        Game::print_string_at_coord(out,   
+        "╭──────────────────╮\n\
+                 │ You Win!         │\n\
+                 │ New Game: ctrl-n │\n\
+                 ╰──────────────────╯",
+                (/* magic */ 58 / 2 - win_message_width / 2) as u16,
+                (TERM_HEIGHT / 2 - win_message_height / 2) as u16);
+    }
+
+    fn print(&self, out: &mut Stdout) {
+        if !self.won {
+            self.print_board(out);
+            self.print_status_bars(out);
+        } else {
+            // won
+            let _ = out.queue(SetAttribute(style::Attribute::Dim));
+            self.print_board(out);
+            let _ = out.queue(SetAttribute(style::Attribute::Reset));
+            self.print_status_bars(out);
+            self.print_win(out);
+        }
+        let _ = out.flush();
+    }
+
+    fn print_string_at_coord(out: &mut Stdout, string: &str, x: u16, y: u16) {
+        for (i, line) in string.lines().enumerate() {
+            let _ = out.queue(cursor::MoveTo(x, y + i as u16));
+            print!("{}", line);
         }
     }
 
@@ -376,7 +413,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     // Create game
     let mut rng = rand::thread_rng();
     let mut game = Game::new(&mut rng);
-    game.print(&stdout);
+    game.print(&mut stdout);
 
     // Game loop
     loop {
@@ -386,22 +423,22 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     break
                 },
                 KeyEvent {code: KeyCode::Left, modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
-                    game.move_cursor_left();
+                    if !game.won {game.move_cursor_left();}
                 },
                 KeyEvent {code: KeyCode::Char('a'), modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
-                    game.move_cursor_left();
+                    if !game.won {game.move_cursor_left();}
                 },
                 KeyEvent {code: KeyCode::Right, modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
-                    game.move_cursor_right();
+                    if !game.won {game.move_cursor_right();}
                 },
                 KeyEvent {code: KeyCode::Char('d'), modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
-                    game.move_cursor_right();
+                    if !game.won {game.move_cursor_right();}
                 },
                 KeyEvent {code: KeyCode::Char(' '), modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
-                    game.handle_card_press();
+                    if !game.won {game.handle_card_press();}
                 },
                 KeyEvent {code: KeyCode::Enter, modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
-                    game.handle_card_press();
+                    if !game.won {game.handle_card_press();}
                 },
                 KeyEvent {code: KeyCode::Char('z'), modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
                     game.perform_undo();
@@ -413,7 +450,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     
                 }
             }
-            game.print(&stdout);
+            game.print(&mut stdout);
             //println!("{:?}", event);
         };
     }
