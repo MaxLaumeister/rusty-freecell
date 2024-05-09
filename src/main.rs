@@ -4,6 +4,8 @@
 // #TODO move count
 // #TODO win screen
 // #TODO decorate foundations with suits
+// #TODO condense top row representation when terminal is small, expand when large
+// #TODO refactor, ci, lint, publish
 
 use std::{cmp, io::{stdout, Stdout, Write}};
 
