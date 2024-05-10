@@ -14,6 +14,9 @@
 // #TODO   get rid of memory allocations/heap (String usage) wherever possible
 // #TODO   don't allow cursor to rest on empty space, when not in select mode
 // #TODO   fix foundation decoration rendering when card is selected
+// #TODO   fix tableau empty column decoration and cursor visibility
+// #TODO   automatically stack cards onto foundation shortcut button
+// #TODO   pet the coyote she has been so good
 
 use std::{cmp, io::{stdout, Stdout, Write}};
 
