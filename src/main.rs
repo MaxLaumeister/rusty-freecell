@@ -10,8 +10,10 @@
 // #TODO ? fix windows terminal behavior
 // #TODO   variable terminal size
 // #TODO   member visibility (modules)
-// #TODO   only allow card to be on matching foundation spot
+// #TODO X only allow card to be on matching foundation spot
 // #TODO   get rid of memory allocations/heap (String usage) wherever possible
+// #TODO   don't allow cursor to rest on empty space, when not in select mode
+// #TODO   fix foundation decoration rendering when card is selected
 
 use std::{cmp, io::{stdout, Stdout, Write}};
 
@@ -291,7 +293,11 @@ impl Game {
                     self.move_cursor_left();
                 }
             }
-            None => ()
+            None => {
+                while self.board.field_lengths[self.highlighted_card] == 0 {
+                    self.move_cursor_left();
+                }
+            }
         }
     }
 
@@ -308,7 +314,11 @@ impl Game {
                     self.move_cursor_right();
                 }
             }
-            None => ()
+            None => {
+                while self.board.field_lengths[self.highlighted_card] == 0 {
+                    self.move_cursor_right();
+                }
+            }
         }
     }
     fn handle_card_press(&mut self) {
@@ -342,9 +352,9 @@ impl Game {
         if to < SUITS {
             // Foundation case
             if to_top_card.rank != 0 {
-                    return from_top_card.rank == to_top_card.rank + 1;
+                    return from_top_card.rank == to_top_card.rank + 1 && from_top_card.suit == to_top_card.suit;
             } else {
-                    return from_top_card.rank == 1;
+                    return from_top_card.rank == 1 && to as u8 == from_top_card.suit - 1;
             }
         } else if to < SUITS + FREE_CELLS {
             // Free cell case
