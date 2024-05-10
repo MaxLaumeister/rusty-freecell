@@ -1,15 +1,17 @@
-// #TODO   eliminate terminal flicker
+// #TODO n eliminate terminal flicker
 // #TODO   error handling
 // #TODO   moving multiple cards at once (shortcut)
 // #TODO X move count
 // #TODO X implement winning screen
-// #TODO   check for win, set win variable
-// #TODO   decorate foundations with suits
+// #TODO   test to make sure winning (and undo after winning) works
+// #TODO X decorate foundations with suits
 // #TODO   condense top row representation when terminal is small, expand when large
 // #TODO   refactor, ci, lint, publish
 // #TODO ? fix windows terminal behavior
 // #TODO   variable terminal size
 // #TODO   member visibility (modules)
+// #TODO   only allow card to be on matching foundation spot
+// #TODO   get rid of memory allocations/heap (String usage) wherever possible
 
 use std::{cmp, io::{stdout, Stdout, Write}};
 
@@ -22,10 +24,10 @@ const RANKS: usize = 13;
 const SUITS: usize = 4;
 const DECK_SIZE: usize = RANKS* SUITS;
 
-const HEARTS: i8 = 1;
-const CLUBS: i8 = 2;
-const DIAMONDS: i8 = 3;
-const SPADES: i8 = 4;
+const HEARTS: u8 = 1;
+const CLUBS: u8 = 2;
+const DIAMONDS: u8 = 3;
+const SPADES: u8 = 4;
 
 const FREE_CELLS: usize = 4;
 const TABLEAU_SIZE: usize = 8;
@@ -39,10 +41,13 @@ const TABLEAU_VERTICAL_OFFSET: usize = 2;
 
 const UNDO_LEVELS: usize = 1000;
 
+const SUIT_STRINGS: [&str;SUITS+1] = [" ", "♥", "♣", "♦", "♠"];
+const RANK_STRINGS: [&str;RANKS+1] = [" ", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+
 #[derive(Default, Copy, Clone)]
 struct Card {
-    rank: i8,
-    suit: i8
+    rank: u8,
+    suit: u8
 }
 
 struct Deck {
@@ -51,8 +56,8 @@ struct Deck {
 
 #[derive(Default, Copy, Clone)]
 struct Move {
-    from: usize,
-    to: usize
+    from: u8,
+    to: u8
 }
 
 impl Deck {
@@ -60,7 +65,7 @@ impl Deck {
         let mut deck = Deck {cards: [Card {rank: 0, suit: 0}; DECK_SIZE as usize]};
         for r in 0..RANKS {
             for s in 0..SUITS {
-                deck.cards[(s*RANKS+r) as usize] = Card{rank: (r+1) as i8, suit: (s+1) as i8};
+                deck.cards[(s*RANKS+r) as usize] = Card{rank: (r+1) as u8, suit: (s+1) as u8};
             }
         }
         deck
@@ -71,29 +76,31 @@ impl Deck {
     }
 }
 
-impl std::fmt::Display for Deck {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{{ ")?;
-        for i in &self.cards {
-            write!(f, "{} ", i)?;
-        }
-        write!(f, "}}")?;
-        Ok(())
-    }
-}
+// For debugging only
 
-impl std::fmt::Display for Card {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let suit_str = match self.suit {
-            0 => "h",
-            1 => "d",
-            2 => "c",
-            3 => "s",
-            _ => "x"
-        };
-        write!(f, "({}, {})", self.rank, suit_str)
-    }
-}
+// impl std::fmt::Display for Deck {
+//     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+//         write!(f, "{{ ")?;
+//         for i in &self.cards {
+//             write!(f, "{} ", i)?;
+//         }
+//         write!(f, "}}")?;
+//         Ok(())
+//     }
+// }
+
+// impl std::fmt::Display for Card {
+//     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+//         let suit_str = match self.suit {
+//             0 => "h",
+//             1 => "d",
+//             2 => "c",
+//             3 => "s",
+//             _ => "x"
+//         };
+//         write!(f, "({}, {})", self.rank, suit_str)
+//     }
+// }
 
 struct Board {
     field: [[Card; DECK_SIZE as usize]; (SUITS + FREE_CELLS + TABLEAU_SIZE) as usize],
@@ -160,7 +167,14 @@ impl Game {
             let top_card = self.board.field[i][if stack_size == 0 {0} else {stack_size - 1}];
             if i < SUITS as usize {
                 // Print foundation
-                Game::print_card_at_coord(out, i * CARD_WIDTH, 1, top_card, (self.highlighted_card as usize == i) && self.won != true, self.selected_card_opt == Some(i));
+                let card_coord_x = i * CARD_WIDTH;
+                let card_coord_y = 1;
+                Game::print_card_at_coord(out, card_coord_x, card_coord_y, top_card, (self.highlighted_card as usize == i) && self.won != true, self.selected_card_opt == Some(i));
+                // Print empty foundation suit decorations
+                if stack_size == 0 {
+                    let _ = out.queue(cursor::MoveTo((card_coord_x + 3) as u16, (card_coord_y + 2) as u16));
+                    print!("{}", SUIT_STRINGS[i+1].dim());
+                }
             } else if i < (SUITS + FREE_CELLS) as usize {
                 // Print free cell
                 Game::print_card_at_coord(out, i * CARD_WIDTH + 2, 1, top_card, (self.highlighted_card as usize == i as usize)  && self.won != true, self.selected_card_opt == Some(i));
@@ -188,32 +202,7 @@ impl Game {
     }
 
     fn print_card_at_coord(out: &mut Stdout, x: usize, y: usize, card: Card, highlighted: bool, selected: bool) {
-        let card_suit_rank_str =
-            format!("{}{}", match card.rank {
-                0 => " ",
-                1 => "A",
-                2 => "2",
-                3 => "3",
-                4 => "4",
-                5 => "5",
-                6 => "6",
-                7 => "7",
-                8 => "8",
-                9 => "9",
-                10 => "10",
-                11 => "J",
-                12 => "Q",
-                13 => "K",
-                _ => "e"
-            }, match card.suit {
-                0 => " ",
-                HEARTS => "♥",
-                CLUBS => "♣",
-                DIAMONDS => "♦",
-                SPADES => "♠",
-                _ => "e"
-            });
-
+        let card_suit_rank_str = RANK_STRINGS[card.rank as usize].to_owned() + SUIT_STRINGS[card.suit as usize];
         let card_display_str;
         if selected {
             card_display_str= format!("\
@@ -377,13 +366,15 @@ impl Game {
         self.board.field_lengths[from as usize] -= 1;
         self.board.field_lengths[to as usize] += 1;
         self.selected_card_opt = None;
+        // Check to see if player won or unwon (due to undo)
+        self.won = self.board.field_lengths[0..SUITS].iter().all(|&x| x == RANKS);
     }
     fn player_try_execute_move(&mut self, from: usize, to: usize) {
         if self.move_is_valid(from, to) {
             // Execute move, add to undo history
             self.execute_move(from, to);
             self.move_count += 1;
-            self.undo_history.push_back(Move{from: from, to: to});
+            self.undo_history.push_back(Move{from: from as u8, to: to as u8});
         }
     }
     fn perform_undo(&mut self) {
@@ -391,7 +382,7 @@ impl Game {
         match last_move_opt {
             Some(last_move) => {
                 // Perform move in reverse, without checking if it follows the rules
-                self.execute_move(last_move.to, last_move.from);
+                self.execute_move(last_move.to as usize, last_move.from as usize);
                 self.move_count -= 1;
             }
             None => {
@@ -451,7 +442,6 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             game.print(&mut stdout);
-            //println!("{:?}", event);
         };
     }
 
