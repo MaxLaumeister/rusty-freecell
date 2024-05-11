@@ -12,9 +12,9 @@
 // #TODO   member visibility (modules)
 // #TODO X only allow card to be on matching foundation spot
 // #TODO   get rid of memory allocations/heap (String usage) wherever possible
-// #TODO   don't allow cursor to rest on empty space, when not in select mode
-// #TODO   fix foundation decoration rendering when card is selected
-// #TODO   fix tableau empty column decoration and cursor visibility
+// #TODO X don't allow cursor to rest on empty space, when not in select mode
+// #TODO X fix foundation decoration rendering when card is selected
+// #TODO X fix tableau empty column decoration and cursor visibility
 // #TODO   automatically stack cards onto foundation shortcut button
 // #TODO   pet the coyote she has been so good
 
@@ -40,8 +40,8 @@ const TABLEAU_SIZE: usize = 8;
 const TERM_WIDTH: usize = 80;
 const TERM_HEIGHT: usize = 24;
 
-const CARD_WIDTH: usize = 7;
-const CARD_HEIGHT: usize = 5;
+const CARD_PRINT_WIDTH: usize = 7;
+const CARD_PRINT_HEIGHT: usize = 5;
 const TABLEAU_VERTICAL_OFFSET: usize = 2;
 
 const UNDO_LEVELS: usize = 1000;
@@ -53,6 +53,12 @@ const RANK_STRINGS: [&str;RANKS+1] = [" ", "A", "2", "3", "4", "5", "6", "7", "8
 struct Card {
     rank: u8,
     suit: u8
+}
+
+impl PartialEq for Card {
+    fn eq(&self, other: &Self) -> bool {
+        self.rank == other.rank && self.suit == other.suit
+    }
 }
 
 struct Deck {
@@ -169,26 +175,42 @@ impl Game {
         for i in 0..(SUITS+FREE_CELLS+TABLEAU_SIZE) as usize {
             let stack = self.board.field[i];
             let stack_size = self.board.field_lengths[i];
-            let top_card = self.board.field[i][if stack_size == 0 {0} else {stack_size - 1}];
+            let mut top_card = self.board.field[i][if stack_size == 0 {0} else {stack_size - 1}];
+            let top_card_is_highlighted = self.highlighted_card as usize == i && self.won != true;
             if i < SUITS as usize {
                 // Print foundation
-                let card_coord_x = i * CARD_WIDTH;
-                let card_coord_y = 1;
-                Game::print_card_at_coord(out, card_coord_x, card_coord_y, top_card, (self.highlighted_card as usize == i) && self.won != true, self.selected_card_opt == Some(i));
-                // Print empty foundation suit decorations
-                if stack_size == 0 {
-                    let _ = out.queue(cursor::MoveTo((card_coord_x + 3) as u16, (card_coord_y + 2) as u16));
-                    print!("{}", SUIT_STRINGS[i+1].dim());
+                // If card is a placeholder, assign a suit for decoration
+                if top_card == Card::default() {
+                    top_card.suit = i as u8 + 1;
                 }
+                Game::print_card_at_coord(
+                    out,
+                    i * CARD_PRINT_WIDTH, 
+                    1, 
+                    top_card, 
+                    top_card_is_highlighted, 
+                    self.selected_card_opt == Some(i)
+                );
             } else if i < (SUITS + FREE_CELLS) as usize {
                 // Print free cell
-                Game::print_card_at_coord(out, i * CARD_WIDTH + 2, 1, top_card, (self.highlighted_card as usize == i as usize)  && self.won != true, self.selected_card_opt == Some(i));
+                Game::print_card_at_coord(
+                    out,
+                    i * CARD_PRINT_WIDTH + 2,
+                    1, top_card,
+                    top_card_is_highlighted,
+                    self.selected_card_opt == Some(i)
+                );
             } else if i < (SUITS + FREE_CELLS + TABLEAU_SIZE) as usize {
-                // Print tableau
-                for (y, &card) in stack.iter().enumerate() {
-                    // if no card there, continue
-                    if card.rank == 0 {continue;};
-                    Game::print_card_at_coord(out, (i - (SUITS + FREE_CELLS) as usize) * CARD_WIDTH + 1, y * TABLEAU_VERTICAL_OFFSET + CARD_HEIGHT + 1, card, (self.highlighted_card as usize == i as usize) && y == self.board.field_lengths[i as usize] - 1 && self.won != true, (self.selected_card_opt == Some(i)) && y == self.board.field_lengths[i as usize] - 1);
+                // Print tableau (at least print placeholders if no card in stack)
+                for y in 0..cmp::max(1, stack_size) {
+                    let card = stack[y];
+                    Game::print_card_at_coord(
+                        out,
+                        (i - (SUITS + FREE_CELLS) as usize) * CARD_PRINT_WIDTH + 1,
+                        y * TABLEAU_VERTICAL_OFFSET + CARD_PRINT_HEIGHT + 1, card,
+                        top_card_is_highlighted && (y + 1 == stack_size || 0 == stack_size), // if we are currently printing top card (or placeholder)
+                        self.selected_card_opt == Some(i) && y + 1 == stack_size
+                    );
                 }
             }
         }
@@ -217,6 +239,15 @@ impl Game {
                 │  △  │\n\
                 ╰─────╯\n",
                 card_suit_rank_str);
+        } else if card.rank == 0 {
+            // Print suit-decorated placeholder
+            card_display_str= format!("\
+            ╭─────╮\n\
+            │     │\n\
+            │ {}  │\n\
+            │     │\n\
+            ╰─────╯\n",
+            card_suit_rank_str);
         } else {
             card_display_str= format!("\
             ╭─────╮\n\
@@ -232,6 +263,9 @@ impl Game {
             let _ = out.queue(cursor::MoveTo(x as u16, y as u16 + d as u16));
             if highlighted {
                 let _= out.queue(style::SetAttribute(style::Attribute::Reverse));
+            } else if card.rank == 0 {
+                // dim placeholder
+                let _= out.queue(style::SetAttribute(style::Attribute::Dim));
             }
             match card.suit {
                 HEARTS | DIAMONDS => {
@@ -245,6 +279,9 @@ impl Game {
             }
             if highlighted {
                 let _= out.queue(style::SetAttribute(style::Attribute::NoReverse));
+            } else if card.rank == 0 {
+                // undim placeholder
+                let _= out.queue(style::SetAttribute(style::Attribute::NormalIntensity));
             }
         }
     }
