@@ -5,13 +5,13 @@
 // #TODO X implement winning screen
 // #TODO   test to make sure winning (and undo after winning) works
 // #TODO X decorate foundations with suits
-// #TODO   condense top row representation when terminal is small, expand when large
+// #TODO n condense top row representation when terminal is small, expand when large
 // #TODO   refactor, ci, lint, publish
 // #TODO ? fix windows terminal behavior
-// #TODO   variable terminal size
+// #TODO X variable terminal size
 // #TODO   member visibility (modules)
 // #TODO X only allow card to be on matching foundation spot
-// #TODO   get rid of memory allocations/heap (String usage) wherever possible
+// #TODO X get rid of memory allocations/heap (String usage) wherever possible
 // #TODO X don't allow cursor to rest on empty space, when not in select mode
 // #TODO X fix foundation decoration rendering when card is selected
 // #TODO X fix tableau empty column decoration and cursor visibility
@@ -41,7 +41,7 @@ const TABLEAU_SIZE: usize = 8;
 const DEFAULT_TERMINAL_WIDTH: u16 = 80;
 const DEFAULT_TERMINAL_HEIGHT: u16 = 24;
 
-const MIN_TERMINAL_WIDTH: u16 = 58;
+const MIN_TERMINAL_WIDTH: u16 = 60;
 const MIN_TERMINAL_HEIGHT: u16 = 24;
 
 const TYPICAL_BOARD_HEIGHT: usize = 24;
@@ -160,6 +160,7 @@ struct Game {
     selected_card_opt: Option<usize>,
     undo_history: CircularBuffer::<UNDO_LEVELS, Move>,
     move_count: u32,
+    highContrast: bool,
     won: bool
 }
 
@@ -171,6 +172,7 @@ impl Game {
             selected_card_opt: None,
             undo_history: CircularBuffer::new(),
             move_count: 0,
+            highContrast: false,
             won: false
         };
         game
@@ -191,20 +193,22 @@ impl Game {
                 }
                 Game::print_card_at_coord(
                     out,
-                    i * CARD_PRINT_WIDTH, 
+                    i * CARD_PRINT_WIDTH + 1, 
                     1, 
                     top_card, 
                     top_card_is_highlighted, 
-                    self.selected_card_opt == Some(i)
+                    self.selected_card_opt == Some(i),
+                    self.highContrast
                 );
             } else if i < (SUITS + FREE_CELLS) as usize {
                 // Print free cell
                 Game::print_card_at_coord(
                     out,
-                    i * CARD_PRINT_WIDTH + 2,
+                    i * CARD_PRINT_WIDTH + 3,
                     1, top_card,
                     top_card_is_highlighted,
-                    self.selected_card_opt == Some(i)
+                    self.selected_card_opt == Some(i),
+                    self.highContrast
                 );
             } else if i < (SUITS + FREE_CELLS + TABLEAU_SIZE) as usize {
                 // Print tableau (at least print placeholders if no card in stack)
@@ -212,31 +216,45 @@ impl Game {
                     let card = stack[y];
                     Game::print_card_at_coord(
                         out,
-                        (i - (SUITS + FREE_CELLS) as usize) * CARD_PRINT_WIDTH + 1,
+                        (i - (SUITS + FREE_CELLS) as usize) * CARD_PRINT_WIDTH + 2,
                         y * TABLEAU_VERTICAL_OFFSET + CARD_PRINT_HEIGHT + 1, card,
                         top_card_is_highlighted && (y + 1 == stack_size || 0 == stack_size), // if we are currently printing top card (or placeholder)
-                        self.selected_card_opt == Some(i) && y + 1 == stack_size
+                        self.selected_card_opt == Some(i) && y + 1 == stack_size,
+                        self.highContrast
                     );
                 }
             }
         }
     }
 
-    fn print_status_bars(&self, out: &mut Stdout) {
+    fn toggle_high_contrast(&mut self) {
+        self.highContrast = !self.highContrast;
+    }
+
+    fn print_chrome(&self, out: &mut Stdout) {
         let (term_width, term_height) = crossterm::terminal::size().unwrap_or_else(|_| (DEFAULT_TERMINAL_WIDTH, DEFAULT_TERMINAL_HEIGHT));
         
         // Print title bar
         let _ = out.queue(cursor::MoveTo(0, 0));
-        print!("--- Rusty FreeCell ---------------------------------------");
+        print!("╭── Rusty FreeCell ────────────────────────────────────────╮");
         let _ = out.queue(cursor::MoveTo(40, 0));
         print!(" Moves: {} ", self.move_count);
 
+        // Print side bars
+
+        for i in 1..term_height {
+            let _ = out.queue(cursor::MoveTo(0, i));
+            print!("│");
+            let _ = out.queue(cursor::MoveTo(MIN_TERMINAL_WIDTH - 1, i));
+            print!("│");
+        }
+
         // Print bottom bar
         let _ = out.queue(cursor::MoveTo(0, term_height));
-        print!("--- (New Game: ctrl-n) - (Undo: z) - (Quit: q) -----------");
+        print!("╰── (New Game: ctrl-n) ─ (Undo: z) ─ (Quit: q) ────────────╯");
     }
 
-    fn print_card_at_coord(out: &mut Stdout, x: usize, y: usize, card: Card, highlighted: bool, selected: bool) {
+    fn print_card_at_coord(out: &mut Stdout, x: usize, y: usize, card: Card, highlighted: bool, selected: bool, high_contrast: bool) {
         let card_suit_rank_str = RANK_STRINGS[card.rank as usize].to_owned() + SUIT_STRINGS[card.suit as usize];
         let card_display_str;
         if selected {
@@ -275,9 +293,35 @@ impl Game {
                 let _= out.queue(style::SetAttribute(style::Attribute::Dim));
             }
 
-            if (card.suit == HEARTS || card.suit == DIAMONDS) && card.rank != 0 {
-                // If it's a red card (and not a placeholder) print in red
-                print!("{}", line.with(Color::Red));
+            if card.rank != 0 {
+                if high_contrast {
+                    match card.suit {
+                        HEARTS => {
+                            print!("{}", line.with(Color::Red));
+                        },
+                        CLUBS => {
+                            print!("{}", line.with(Color::Magenta));
+                        },
+                        DIAMONDS => {
+                            print!("{}", line.with(Color::DarkCyan));
+                        },
+                        SPADES => {
+                            print!("{}", line.with(Color::DarkYellow));
+                        },
+                        _ => {
+                            print!("{}", line);
+                        }
+                    }
+                } else {
+                    match card.suit {
+                        HEARTS | DIAMONDS  => {
+                            print!("{}", line.with(Color::Red));
+                        },
+                        _ => {
+                            print!("{}", line);
+                        }
+                    }
+                }
             } else {
                 print!("{}", line);
             }
@@ -306,13 +350,13 @@ impl Game {
     fn print(&self, out: &mut Stdout) {
         if !self.won {
             self.print_board(out);
-            self.print_status_bars(out);
+            self.print_chrome(out);
         } else {
             // won
             let _ = out.queue(SetAttribute(style::Attribute::Dim));
             self.print_board(out);
             let _ = out.queue(SetAttribute(style::Attribute::Reset));
-            self.print_status_bars(out);
+            self.print_chrome(out);
             self.print_win(out);
         }
         let _ = out.flush();
@@ -490,11 +534,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     KeyEvent {code: KeyCode::Char('z'), modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
                         game.perform_undo();
                     },
+                    KeyEvent {code: KeyCode::Char('h'), modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
+                        game.toggle_high_contrast();
+                    },
                     KeyEvent {code: KeyCode::Char('n'), modifiers: event::KeyModifiers::CONTROL, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
                         game = Game::new(&mut rng);
-                    },
-                    Resize => {
-                        
                     },
                     _ => {
                         
@@ -502,7 +546,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 }
             },
             Event::Resize(term_width, term_height) => {
-                game.print(&mut stdout);
+                // Resize event falls through and triggers game to print again
             }
             _ => {}
         }
@@ -524,7 +568,7 @@ fn main() -> impl std::process::Termination {
     //std::env::set_var("RUST_BACKTRACE", "1");
     let (term_width, term_height) = crossterm::terminal::size().unwrap();
     if term_width < MIN_TERMINAL_WIDTH || term_height < MIN_TERMINAL_HEIGHT {
-        println!("Your terminal is too small for FreeCell! It's gotta be at least {} chars wide and {} chars tall.", MIN_TERMINAL_WIDTH, MIN_TERMINAL_HEIGHT);
+        println!("Your terminal window is too small for FreeCell! It's gotta be at least {} chars wide and {} chars tall.", MIN_TERMINAL_WIDTH, MIN_TERMINAL_HEIGHT);
         return Err("terminal too small");
     }
     let _ = run();
