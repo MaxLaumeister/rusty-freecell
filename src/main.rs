@@ -16,6 +16,7 @@
 // #TODO X fix foundation decoration rendering when card is selected
 // #TODO X fix tableau empty column decoration and cursor visibility
 // #TODO   automatically stack cards onto foundation shortcut button
+// #TODO   implement "symbol blind" mode - cyan and yellow suits
 // #TODO   pet the coyote she has been so good
 
 use std::{cmp, io::{stdout, Stdout, Write}};
@@ -36,6 +37,12 @@ const SPADES: u8 = 4;
 
 const FREE_CELLS: usize = 4;
 const TABLEAU_SIZE: usize = 8;
+
+const DEFAULT_TERMINAL_WIDTH: u16 = 80;
+const DEFAULT_TERMINAL_HEIGHT: u16 = 24;
+
+const MIN_TERMINAL_WIDTH: u16 = 58;
+const MIN_TERMINAL_HEIGHT: u16 = 24;
 
 const TYPICAL_BOARD_HEIGHT: usize = 24;
 
@@ -216,6 +223,8 @@ impl Game {
     }
 
     fn print_status_bars(&self, out: &mut Stdout) {
+        let (term_width, term_height) = crossterm::terminal::size().unwrap_or_else(|_| (DEFAULT_TERMINAL_WIDTH, DEFAULT_TERMINAL_HEIGHT));
+        
         // Print title bar
         let _ = out.queue(cursor::MoveTo(0, 0));
         print!("--- Rusty FreeCell ---------------------------------------");
@@ -223,7 +232,7 @@ impl Game {
         print!(" Moves: {} ", self.move_count);
 
         // Print bottom bar
-        let _ = out.queue(cursor::MoveTo(0, TYPICAL_BOARD_HEIGHT as u16));
+        let _ = out.queue(cursor::MoveTo(0, term_height));
         print!("--- (New Game: ctrl-n) - (Undo: z) - (Quit: q) -----------");
     }
 
@@ -258,7 +267,6 @@ impl Game {
         }
 
         for (d, line) in card_display_str.lines().enumerate() {
-            if y+d >= TYPICAL_BOARD_HEIGHT {break};
             let _ = out.queue(cursor::MoveTo(x as u16, y as u16 + d as u16));
             if highlighted {
                 let _= out.queue(style::SetAttribute(style::Attribute::Reverse));
@@ -440,7 +448,6 @@ impl Game {
 }
 
 fn run() -> Result<(), Box<dyn std::error::Error>> {
-    
     // Prepare terminal
     crossterm::terminal::enable_raw_mode()?;
     let mut stdout = stdout();
@@ -455,43 +462,52 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     // Game loop
     loop {
-        if let Event::Key(event) = event::read().expect("Failed to read line") {
-            match event {
-                KeyEvent {code: KeyCode::Char('q'), modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
-                    break
-                },
-                KeyEvent {code: KeyCode::Left, modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
-                    if !game.won {game.move_cursor_left();}
-                },
-                KeyEvent {code: KeyCode::Char('a'), modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
-                    if !game.won {game.move_cursor_left();}
-                },
-                KeyEvent {code: KeyCode::Right, modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
-                    if !game.won {game.move_cursor_right();}
-                },
-                KeyEvent {code: KeyCode::Char('d'), modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
-                    if !game.won {game.move_cursor_right();}
-                },
-                KeyEvent {code: KeyCode::Char(' '), modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
-                    if !game.won {game.handle_card_press();}
-                },
-                KeyEvent {code: KeyCode::Enter, modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
-                    if !game.won {game.handle_card_press();}
-                },
-                KeyEvent {code: KeyCode::Char('z'), modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
-                    game.perform_undo();
-                },
-                KeyEvent {code: KeyCode::Char('n'), modifiers: event::KeyModifiers::CONTROL, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
-                    game = Game::new(&mut rng);
-                },
-                _ => {
-                    
+        let event = event::read()?;
+        match event {
+            Event::Key(key_event) => {
+                match key_event {
+                    KeyEvent {code: KeyCode::Char('q'), modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
+                        break
+                    },
+                    KeyEvent {code: KeyCode::Left, modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
+                        if !game.won {game.move_cursor_left();}
+                    },
+                    KeyEvent {code: KeyCode::Char('a'), modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
+                        if !game.won {game.move_cursor_left();}
+                    },
+                    KeyEvent {code: KeyCode::Right, modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
+                        if !game.won {game.move_cursor_right();}
+                    },
+                    KeyEvent {code: KeyCode::Char('d'), modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
+                        if !game.won {game.move_cursor_right();}
+                    },
+                    KeyEvent {code: KeyCode::Char(' '), modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
+                        if !game.won {game.handle_card_press();}
+                    },
+                    KeyEvent {code: KeyCode::Enter, modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
+                        if !game.won {game.handle_card_press();}
+                    },
+                    KeyEvent {code: KeyCode::Char('z'), modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
+                        game.perform_undo();
+                    },
+                    KeyEvent {code: KeyCode::Char('n'), modifiers: event::KeyModifiers::CONTROL, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
+                        game = Game::new(&mut rng);
+                    },
+                    Resize => {
+                        
+                    },
+                    _ => {
+                        
+                    }
                 }
+            },
+            Event::Resize(term_width, term_height) => {
+                game.print(&mut stdout);
             }
-            game.print(&mut stdout);
-        };
+            _ => {}
+        }
+        game.print(&mut stdout);
     }
-
     Ok(())
 }
 
@@ -505,7 +521,13 @@ fn cleanup() {
 }
 
 fn main() -> impl std::process::Termination {
-    std::env::set_var("RUST_BACKTRACE", "1");
+    //std::env::set_var("RUST_BACKTRACE", "1");
+    let (term_width, term_height) = crossterm::terminal::size().unwrap();
+    if term_width < MIN_TERMINAL_WIDTH || term_height < MIN_TERMINAL_HEIGHT {
+        println!("Your terminal is too small for FreeCell! It's gotta be at least {} chars wide and {} chars tall.", MIN_TERMINAL_WIDTH, MIN_TERMINAL_HEIGHT);
+        return Err("terminal too small");
+    }
     let _ = run();
     cleanup();
+    return Ok(());
 }
