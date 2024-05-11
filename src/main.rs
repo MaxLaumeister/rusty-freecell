@@ -16,7 +16,7 @@
 // #TODO X fix foundation decoration rendering when card is selected
 // #TODO X fix tableau empty column decoration and cursor visibility
 // #TODO   automatically stack cards onto foundation shortcut button
-// #TODO   implement "symbol blind" mode - cyan and yellow suits
+// #TODO X implement "symbol blind" mode - cyan and yellow suits
 // #TODO   pet the coyote she has been so good
 
 use std::{cmp, io::{stdout, Stdout, Write}};
@@ -251,7 +251,7 @@ impl Game {
 
         // Print bottom bar
         let _ = out.queue(cursor::MoveTo(0, term_height));
-        print!("╰── (New Game: ctrl-n) ─ (Undo: z) ─ (Quit: q) ────────────╯");
+        print!("╰── (New Game: ctrl-n) ─ (Undo: z) ─ (Quit: ctrl-q) ───────╯");
     }
 
     fn print_card_at_coord(out: &mut Stdout, x: usize, y: usize, card: Card, highlighted: bool, selected: bool, high_contrast: bool) {
@@ -410,6 +410,27 @@ impl Game {
             }
         }
     }
+
+    fn quick_stack_to_foundations(&mut self) {
+        let mut source_column = 0;
+        let mut target_column = 0;
+
+        'outer: while source_column < self.board.field.len() {
+            while target_column < SUITS {
+                if self.move_is_valid(source_column, target_column) {
+                    self.player_try_execute_move(source_column, target_column);
+                    // Reset the loop to check the new board state for more opportunities
+                    source_column = 0;
+                    target_column = 0;
+                    continue 'outer;
+                }
+                target_column += 1;
+            }
+            target_column = 0;
+            source_column += 1;
+        }
+    }
+
     fn handle_card_press(&mut self) {
         if self.selected_card_opt == None {
             // Select a card
@@ -435,9 +456,9 @@ impl Game {
         return false;
     }
     fn move_is_valid(&self, from: usize, to: usize) -> bool {
+        if from == to {return false;};
         let from_top_card = if self.board.field_lengths[from as usize] > 0 {self.board.field[from as usize][self.board.field_lengths[from as usize] - 1]} else {Card::default()};
         let to_top_card = if self.board.field_lengths[to as usize] > 0 {self.board.field[to as usize][self.board.field_lengths[to as usize] - 1]} else {Card::default()};
-        if from == to {return true;};
         if to < SUITS {
             // Foundation case
             if to_top_card.rank != 0 {
@@ -510,7 +531,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         match event {
             Event::Key(key_event) => {
                 match key_event {
-                    KeyEvent {code: KeyCode::Char('q'), modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
+                    KeyEvent {code: KeyCode::Char('q'), modifiers: event::KeyModifiers::CONTROL, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
                         break
                     },
                     KeyEvent {code: KeyCode::Left, modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
@@ -536,6 +557,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     },
                     KeyEvent {code: KeyCode::Char('h'), modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
                         game.toggle_high_contrast();
+                    },
+                    KeyEvent {code: KeyCode::Char('f'), modifiers: event::KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
+                        game.quick_stack_to_foundations();
                     },
                     KeyEvent {code: KeyCode::Char('n'), modifiers: event::KeyModifiers::CONTROL, kind: crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat, state: _} => {
                         game = Game::new(&mut rng);
@@ -565,7 +589,7 @@ fn cleanup() {
 }
 
 fn main() -> impl std::process::Termination {
-    //std::env::set_var("RUST_BACKTRACE", "1");
+    std::env::set_var("RUST_BACKTRACE", "1");
     let (term_width, term_height) = crossterm::terminal::size().unwrap();
     if term_width < MIN_TERMINAL_WIDTH || term_height < MIN_TERMINAL_HEIGHT {
         println!("Your terminal window is too small for FreeCell! It's gotta be at least {} chars wide and {} chars tall.", MIN_TERMINAL_WIDTH, MIN_TERMINAL_HEIGHT);
