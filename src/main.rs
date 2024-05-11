@@ -1,6 +1,6 @@
 // #TODO n eliminate terminal flicker
 // #TODO   error handling
-// #TODO   moving multiple cards at once (shortcut)
+// #TODO n moving multiple cards at once (shortcut)
 // #TODO X move count
 // #TODO X implement winning screen
 // #TODO   test to make sure winning (and undo after winning) works
@@ -37,8 +37,7 @@ const SPADES: u8 = 4;
 const FREE_CELLS: usize = 4;
 const TABLEAU_SIZE: usize = 8;
 
-const TERM_WIDTH: usize = 80;
-const TERM_HEIGHT: usize = 24;
+const TYPICAL_BOARD_HEIGHT: usize = 24;
 
 const CARD_PRINT_WIDTH: usize = 7;
 const CARD_PRINT_HEIGHT: usize = 5;
@@ -224,7 +223,7 @@ impl Game {
         print!(" Moves: {} ", self.move_count);
 
         // Print bottom bar
-        let _ = out.queue(cursor::MoveTo(0, TERM_HEIGHT as u16));
+        let _ = out.queue(cursor::MoveTo(0, TYPICAL_BOARD_HEIGHT as u16));
         print!("--- (New Game: ctrl-n) - (Undo: z) - (Quit: q) -----------");
     }
 
@@ -259,7 +258,7 @@ impl Game {
         }
 
         for (d, line) in card_display_str.lines().enumerate() {
-            if y+d >= TERM_HEIGHT {break};
+            if y+d >= TYPICAL_BOARD_HEIGHT {break};
             let _ = out.queue(cursor::MoveTo(x as u16, y as u16 + d as u16));
             if highlighted {
                 let _= out.queue(style::SetAttribute(style::Attribute::Reverse));
@@ -267,16 +266,14 @@ impl Game {
                 // dim placeholder
                 let _= out.queue(style::SetAttribute(style::Attribute::Dim));
             }
-            match card.suit {
-                HEARTS | DIAMONDS => {
-                    // Print red card
-                    print!("{}", line.with(Color::Red));
-                }
-                _ => {
-                    // Print black or placeholder card
-                    print!("{}", line);
-                }
+
+            if (card.suit == HEARTS || card.suit == DIAMONDS) && card.rank != 0 {
+                // If it's a red card (and not a placeholder) print in red
+                print!("{}", line.with(Color::Red));
+            } else {
+                print!("{}", line);
             }
+
             if highlighted {
                 let _= out.queue(style::SetAttribute(style::Attribute::NoReverse));
             } else if card.rank == 0 {
@@ -295,7 +292,7 @@ impl Game {
                  │ New Game: ctrl-n │\n\
                  ╰──────────────────╯",
                 (/* magic */ 58 / 2 - win_message_width / 2) as u16,
-                (TERM_HEIGHT / 2 - win_message_height / 2) as u16);
+                (TYPICAL_BOARD_HEIGHT / 2 - win_message_height / 2) as u16);
     }
 
     fn print(&self, out: &mut Stdout) {
