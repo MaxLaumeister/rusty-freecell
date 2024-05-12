@@ -374,16 +374,16 @@ impl Game {
                 if high_contrast {
                     match card.suit {
                         HEARTS => {
-                            print!("{}", line.with(style::Color::Red));
+                            print!("{}", line.with(style::Color::DarkRed));
                         },
                         CLUBS => {
-                            print!("{}", line.with(style::Color::Magenta));
+                            print!("{}", line.with(style::Color::White));
                         },
                         DIAMONDS => {
-                            print!("{}", line.with(style::Color::DarkCyan));
+                            print!("{}", line.with(style::Color::Magenta));
                         },
                         SPADES => {
-                            print!("{}", line.with(style::Color::DarkYellow));
+                            print!("{}", line.with(style::Color::Yellow));
                         },
                         _ => {
                             print!("{}", line);
