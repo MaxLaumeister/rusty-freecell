@@ -58,7 +58,7 @@ const SUIT_STRINGS: [&str;SUITS+1] = [" ", "♥", "♣", "♦", "♠"];
 const RANK_STRINGS: [&str;RANKS+1] = [" ", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
 
 #[derive(Default, Copy, Clone)]
-struct Card {
+pub struct Card {
     rank: u8,
     suit: u8
 }
@@ -143,7 +143,7 @@ impl CardStack {
         self.cards[self.length] = card;
         self.length += 1;
     }
-    fn peek(&mut self) -> Option<Card> {
+    fn peek(self) -> Option<Card> {
         if self.length == 0 {
             None
         } else {
@@ -156,6 +156,43 @@ impl CardStack {
             self.length -= 1;
         }
         card_opt
+    }
+    fn is_empty(&self) -> bool {
+        return self.length == 0;
+    }
+    fn size(&self) -> usize {
+        return self.length;
+    }
+}
+
+impl IntoIterator for CardStack {
+    type Item = Card;
+    type IntoIter = CardStackIntoIterator;
+
+    fn into_iter(self) -> Self::IntoIter {
+        CardStackIntoIterator {
+            card_stack: self,
+            index: 0,
+        }
+    }
+}
+
+pub struct CardStackIntoIterator {
+    card_stack: CardStack,
+    index: usize,
+}
+
+impl Iterator for CardStackIntoIterator {
+    type Item = Card;
+
+    fn next(&mut self) -> Option<Card> {
+        if self.index < self.card_stack.length {
+            let card = self.card_stack.cards[self.index];
+            self.index += 1;
+            Some(card)
+        } else {
+            None
+        }
     }
 }
 
@@ -170,9 +207,8 @@ impl Board {
 
         // Deal deck onto the board
         for (i, card) in deck.cards.iter().enumerate() {
-            let field_column = (SUITS + FREE_CELLS) as usize + (i % TABLEAU_SIZE);
-            board.field[field_column][board.field_lengths[field_column]] = *card;
-            board.field[field_column].length += 1;
+            let field_column = SUITS + FREE_CELLS + (i % TABLEAU_SIZE);
+            board.field[field_column].push(*card);
         }
 
         board
@@ -205,16 +241,15 @@ impl Game {
     fn print_board(&self, out: &mut Stdout) -> Result<(), io::Error> {
         out.queue(terminal::Clear(terminal::ClearType::All))?;
 
-        for i in 0..(SUITS+FREE_CELLS+TABLEAU_SIZE) as usize {
+        for i in 0..FIELD_SIZE as usize {
             let stack = self.board.field[i];
-            let stack_size = self.board.field_lengths[i];
-            let mut top_card = self.board.field[i][if stack_size == 0 {0} else {stack_size - 1}];
+            let mut top_card = stack.peek().unwrap_or_default();
             let top_card_is_highlighted = self.highlighted_card as usize == i && self.won != true;
             if i < SUITS as usize {
                 // Print foundation
                 // If card is a placeholder, assign a suit for decoration
                 if top_card == Card::default() {
-                    top_card.suit = i as u8 + 1;
+                    top_card = Card{rank: 0, suit: i as u8 + 1};
                 }
                 Game::print_card_at_coord(
                     out,
@@ -236,15 +271,29 @@ impl Game {
                     self.high_contrast
                 )?;
             } else if i < (SUITS + FREE_CELLS + TABLEAU_SIZE) as usize {
-                // Print tableau (at least print placeholders if no card in stack)
-                for y in 0..cmp::max(1, stack_size) {
-                    let card = stack[y];
+                // Print tableau column card-by-card
+                let mut card_stack_iter = stack.into_iter().enumerate().peekable();
+                while let Some((y, card)) = card_stack_iter.next() {
+                    let is_top_card = card_stack_iter.peek().is_none(); // Check if we are currently printing the top card
                     Game::print_card_at_coord(
                         out,
                         (i - (SUITS + FREE_CELLS) as usize) * CARD_PRINT_WIDTH + 2,
-                        y * TABLEAU_VERTICAL_OFFSET + CARD_PRINT_HEIGHT + 1, card,
-                        top_card_is_highlighted && (y + 1 == stack_size || 0 == stack_size), // if we are currently printing top card (or placeholder)
-                        self.selected_card_opt == Some(i) && y + 1 == stack_size,
+                        y * TABLEAU_VERTICAL_OFFSET + CARD_PRINT_HEIGHT + 1,
+                        card,
+                        top_card_is_highlighted && is_top_card,
+                        self.selected_card_opt == Some(i) && is_top_card,
+                        self.high_contrast,
+                    )?;
+                }
+                // If tableau column is empty, print placeholder instead
+                if stack.is_empty() {
+                    Game::print_card_at_coord(
+                        out,
+                        (i - (SUITS + FREE_CELLS) as usize) * CARD_PRINT_WIDTH + 2,
+                        CARD_PRINT_HEIGHT + 1,
+                        top_card,
+                        top_card_is_highlighted,
+                        self.selected_card_opt == Some(i),
                         self.high_contrast
                     )?;
                 }
@@ -411,12 +460,12 @@ impl Game {
 
         match self.selected_card_opt {
             Some(selected_card) => {
-                while !self.move_is_valid(selected_card, self.highlighted_card) {
+                while !self.move_is_valid(selected_card, self.highlighted_card) && selected_card != self.highlighted_card {
                     self.move_cursor_left();
                 }
             }
             None => {
-                while self.board.field_lengths[self.highlighted_card] == 0 {
+                while self.board.field[self.highlighted_card].peek() == None {
                     self.move_cursor_left();
                 }
             }
@@ -432,12 +481,12 @@ impl Game {
 
         match self.selected_card_opt {
             Some(selected_card) => {
-                while !self.move_is_valid(selected_card, self.highlighted_card) {
+                while !self.move_is_valid(selected_card, self.highlighted_card) && selected_card != self.highlighted_card {
                     self.move_cursor_right();
                 }
             }
             None => {
-                while self.board.field_lengths[self.highlighted_card] == 0 {
+                while self.board.field[self.highlighted_card].peek() == None {
                     self.move_cursor_right();
                 }
             }
@@ -490,8 +539,8 @@ impl Game {
     }
     fn move_is_valid(&self, from: usize, to: usize) -> bool {
         if from == to {return false;};
-        let from_top_card = if self.board.field_lengths[from as usize] > 0 {self.board.field[from as usize][self.board.field_lengths[from as usize] - 1]} else {Card::default()};
-        let to_top_card = if self.board.field_lengths[to as usize] > 0 {self.board.field[to as usize][self.board.field_lengths[to as usize] - 1]} else {Card::default()};
+        let from_top_card = self.board.field[from].peek().unwrap_or_default();
+        let to_top_card = self.board.field[to].peek().unwrap_or_default();
         if to < SUITS {
             // Foundation case
             if to_top_card.rank != 0 {
@@ -514,13 +563,17 @@ impl Game {
     }
     fn execute_move (&mut self, from: usize, to: usize) {
         // Execute the move
-        self.board.field[to as usize][self.board.field_lengths[to as usize]] = self.board.field[from as usize][self.board.field_lengths[from as usize] - 1];
-        self.board.field[from as usize][self.board.field_lengths[from as usize] - 1] = Default::default();
-        self.board.field_lengths[from as usize] -= 1;
-        self.board.field_lengths[to as usize] += 1;
+        // Move "from" card to "to" column
+        let from_card_opt = self.board.field[from].pop();
+        match from_card_opt {
+            Some(from_card) => {
+                self.board.field[to].push(from_card);
+            },
+            None => {}
+        }
         self.selected_card_opt = None;
         // Check to see if player won or unwon (due to undo)
-        self.won = self.board.field_lengths[0..SUITS].iter().all(|&x| x == RANKS);
+        self.won = self.board.field.iter().all(|&stack| stack.size() == RANKS);
     }
     fn player_try_execute_move(&mut self, from: usize, to: usize) {
         if self.move_is_valid(from, to) {
