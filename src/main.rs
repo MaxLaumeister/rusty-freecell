@@ -20,6 +20,10 @@
 // #TODO X change array access to use iterators instead of indexing wherever possible, to prevent out of bounds errors
 // #TODO   pet the coyote she has been so good
 
+mod cards;
+use crate::cards::CardStack;
+use crate::cards::Card;
+
 use std::io::{self, stdout, Stdout, Write};
 
 use circular_buffer::CircularBuffer;
@@ -58,134 +62,9 @@ const SUIT_STRINGS: [&str;SUITS+1] = [" ", "♥", "♣", "♦", "♠"];
 const RANK_STRINGS: [&str;RANKS+1] = [" ", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
 
 #[derive(Default, Copy, Clone)]
-pub struct Card {
-    rank: u8,
-    suit: u8
-}
-
-impl PartialEq for Card {
-    fn eq(&self, other: &Self) -> bool {
-        self.rank == other.rank && self.suit == other.suit
-    }
-}
-
-#[derive(Default, Copy, Clone)]
 struct Move {
     from: u8,
     to: u8
-}
-
-// For debugging only
-
-// impl std::fmt::Display for Deck {
-//     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-//         write!(f, "{{ ")?;
-//         for i in &self.cards {
-//             write!(f, "{} ", i)?;
-//         }
-//         write!(f, "}}")?;
-//         Ok(())
-//     }
-// }
-
-// impl std::fmt::Display for Card {
-//     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-//         let suit_str = match self.suit {
-//             0 => "h",
-//             1 => "d",
-//             2 => "c",
-//             3 => "s",
-//             _ => "x"
-//         };
-//         write!(f, "({}, {})", self.rank, suit_str)
-//     }
-// }
-
-#[derive(Copy, Clone)]
-struct CardStack {
-    cards: [Card; DECK_SIZE as usize],
-    length: usize
-}
-
-impl Default for CardStack {
-    fn default() -> Self {
-        CardStack {
-            cards: [Card::default(); DECK_SIZE],
-            length: 0,
-        }
-    }
-}
-
-impl CardStack {
-    fn push(&mut self, card: Card) {
-        self.cards[self.length] = card;
-        self.length += 1;
-    }
-    fn peek(self) -> Option<Card> {
-        if self.length == 0 {
-            None
-        } else {
-            Some(self.cards[self.length - 1])
-        }
-    }
-    fn pop(&mut self) -> Option<Card> {
-        let card_opt = self.peek();
-        if self.length != 0 {
-            self.length -= 1;
-        }
-        card_opt
-    }
-    fn is_empty(&self) -> bool {
-        return self.length == 0;
-    }
-    fn size(&self) -> usize {
-        return self.
-        length;
-    }
-    fn new_standard_deck() -> CardStack {
-        return CardStack {
-            cards: core::array::from_fn(|i| Card {
-                rank: (i % RANKS + 1) as u8,
-                suit: (i / RANKS + 1) as u8
-            }),
-            length: DECK_SIZE
-        };
-    }
-    fn shuffle(&mut self, rng: &mut rand::rngs::ThreadRng) {
-        use rand::seq::SliceRandom;
-        self.cards.shuffle(rng);
-    }
-}
-
-impl IntoIterator for CardStack {
-    type Item = Card;
-    type IntoIter = CardStackIntoIterator;
-
-    fn into_iter(self) -> Self::IntoIter {
-        CardStackIntoIterator {
-            card_stack: self,
-            index: 0,
-        }
-    }
-}
-
-pub struct CardStackIntoIterator {
-    card_stack: CardStack,
-    index: usize,
-}
-
-impl Iterator for CardStackIntoIterator {
-    type Item = Card;
-
-    fn next(&mut self) -> Option<Card> {
-        if self.index < self.card_stack.length {
-            let card = self.card_stack.cards[self.index];
-            self.index += 1;
-            Some(card)
-        } else {
-            None
-        }
-    }
 }
 
 struct Game {
@@ -213,9 +92,9 @@ impl Game {
         // Deal deck onto the board
         let mut deck = CardStack::new_standard_deck();
         deck.shuffle(rng);
-        for (i, card) in deck.cards.iter().enumerate() {
+        for (i, card) in deck.into_iter().enumerate() {
             let field_column = SUITS + FREE_CELLS + (i % TABLEAU_SIZE);
-            game.field[field_column].push(*card);
+            game.field[field_column].push(card);
         }
 
         game
@@ -505,7 +384,7 @@ impl Game {
     fn are_opposite_colors(card1: Card, card2: Card) -> bool {
         if card1.suit == HEARTS || card1.suit == DIAMONDS {return card2.suit == SPADES || card2.suit == CLUBS};
         if card1.suit == SPADES || card1.suit == CLUBS {return card2.suit == HEARTS || card2.suit == DIAMONDS};
-        return false;
+        false
     }
     fn move_is_valid(&self, from: usize, to: usize) -> bool {
         if from == to {return false;};
@@ -529,7 +408,7 @@ impl Game {
                 return true;
             }
         }
-        return false;
+        false
     }
     fn execute_move (&mut self, from: usize, to: usize) {
         // Execute the move
