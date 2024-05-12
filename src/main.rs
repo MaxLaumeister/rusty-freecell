@@ -493,23 +493,19 @@ impl Game {
     }
 
     fn quick_stack_to_foundations(&mut self) {
-        let mut source_column = 0;
-        let mut target_column = 0;
+        let mut made_move = false;
 
-        'outer: while source_column < self.board.field.len() {
-            while target_column < SUITS {
+        'outer: for source_column in 0..self.board.field.len() {
+            for target_column in 0..SUITS {
                 if self.move_is_valid(source_column, target_column) {
                     self.player_try_execute_move(source_column, target_column);
-                    // Reset the loop to check the new board state for more opportunities
-                    source_column = 0;
-                    target_column = 0;
-                    continue 'outer;
+                    made_move = true;
+                    break 'outer;
                 }
-                target_column += 1;
             }
-            target_column = 0;
-            source_column += 1;
         }
+        // If we made a move, check the new board state for more opportunities
+        if made_move {self.quick_stack_to_foundations()};
     }
 
     fn handle_card_press(&mut self) {
