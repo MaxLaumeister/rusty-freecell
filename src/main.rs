@@ -69,28 +69,10 @@ impl PartialEq for Card {
     }
 }
 
-struct Deck {
-    cards: [Card; DECK_SIZE as usize]
-}
-
 #[derive(Default, Copy, Clone)]
 struct Move {
     from: u8,
     to: u8
-}
-
-impl Deck {
-    fn standard() -> Deck {
-        let mut deck = Deck {cards: [Card {rank: 0, suit: 0}; DECK_SIZE as usize]};
-        deck.cards.iter_mut().enumerate().for_each(|(i, card)| {
-            *card = Card { rank: (i % RANKS + 1) as u8, suit: (i / RANKS + 1) as u8 };
-        });
-        deck
-    }
-    fn shuffle(&mut self, rng: &mut rand::rngs::ThreadRng) {
-        use rand::seq::SliceRandom;
-        self.cards.shuffle(rng);
-    }
 }
 
 // For debugging only
@@ -118,10 +100,6 @@ impl Deck {
 //         write!(f, "({}, {})", self.rank, suit_str)
 //     }
 // }
-
-struct Board {
-    field: [CardStack; FIELD_SIZE]
-}
 
 #[derive(Copy, Clone)]
 struct CardStack {
@@ -161,7 +139,21 @@ impl CardStack {
         return self.length == 0;
     }
     fn size(&self) -> usize {
-        return self.length;
+        return self.
+        length;
+    }
+    fn new_standard_deck() -> CardStack {
+        return CardStack {
+            cards: core::array::from_fn(|i| Card {
+                rank: (i % RANKS + 1) as u8,
+                suit: (i / RANKS + 1) as u8
+            }),
+            length: DECK_SIZE
+        };
+    }
+    fn shuffle(&mut self, rng: &mut rand::rngs::ThreadRng) {
+        use rand::seq::SliceRandom;
+        self.cards.shuffle(rng);
     }
 }
 
@@ -196,27 +188,8 @@ impl Iterator for CardStackIntoIterator {
     }
 }
 
-impl Board {
-    fn new(rng: &mut rand::rngs::ThreadRng) -> Board {
-        let mut board = Board {
-            field: [CardStack::default(); FIELD_SIZE]
-        };
-
-        let mut deck = Deck::standard();
-        deck.shuffle(rng);
-
-        // Deal deck onto the board
-        for (i, card) in deck.cards.iter().enumerate() {
-            let field_column = SUITS + FREE_CELLS + (i % TABLEAU_SIZE);
-            board.field[field_column].push(*card);
-        }
-
-        board
-    }
-}
-
 struct Game {
-    board: Board,
+    field: [CardStack; FIELD_SIZE],
     highlighted_card: usize,
     selected_card_opt: Option<usize>,
     undo_history: CircularBuffer::<UNDO_LEVELS, Move>,
@@ -227,8 +200,8 @@ struct Game {
 
 impl Game {
     fn new(rng: &mut rand::rngs::ThreadRng) -> Game {
-        let game = Game {
-            board: Board::new(rng),
+        let mut game = Game {
+            field: [CardStack::default(); FIELD_SIZE],
             highlighted_card: SUITS + FREE_CELLS,
             selected_card_opt: None,
             undo_history: CircularBuffer::new(),
@@ -236,12 +209,21 @@ impl Game {
             high_contrast: false,
             won: false
         };
+
+        // Deal deck onto the board
+        let mut deck = CardStack::new_standard_deck();
+        deck.shuffle(rng);
+        for (i, card) in deck.cards.iter().enumerate() {
+            let field_column = SUITS + FREE_CELLS + (i % TABLEAU_SIZE);
+            game.field[field_column].push(*card);
+        }
+
         game
     }
     fn print_board(&self, out: &mut Stdout) -> Result<(), io::Error> {
         out.queue(terminal::Clear(terminal::ClearType::All))?;
 
-        for (i, stack) in self.board.field.iter().enumerate() {
+        for (i, stack) in self.field.iter().enumerate() {
             let mut top_card = stack.peek().unwrap_or_default();
             let top_card_is_highlighted = self.highlighted_card as usize == i && self.won != true;
             if i < SUITS as usize {
@@ -461,7 +443,7 @@ impl Game {
                 }
             }
             None => {
-                while self.board.field[self.highlighted_card].peek() == None {
+                while self.field[self.highlighted_card].peek() == None {
                     self.move_cursor_left();
                 }
             }
@@ -478,7 +460,7 @@ impl Game {
                 }
             }
             None => {
-                while self.board.field[self.highlighted_card].peek() == None {
+                while self.field[self.highlighted_card].peek() == None {
                     self.move_cursor_right();
                 }
             }
@@ -488,7 +470,7 @@ impl Game {
     fn quick_stack_to_foundations(&mut self) {
         let mut made_move = false;
 
-        'outer: for source_column in 0..self.board.field.len() {
+        'outer: for source_column in 0..self.field.len() {
             for target_column in 0..SUITS {
                 if self.move_is_valid(source_column, target_column) {
                     self.player_try_execute_move(source_column, target_column);
@@ -527,8 +509,8 @@ impl Game {
     }
     fn move_is_valid(&self, from: usize, to: usize) -> bool {
         if from == to {return false;};
-        let from_top_card = self.board.field[from].peek().unwrap_or_default();
-        let to_top_card = self.board.field[to].peek().unwrap_or_default();
+        let from_top_card = self.field[from].peek().unwrap_or_default();
+        let to_top_card = self.field[to].peek().unwrap_or_default();
         if to < SUITS {
             // Foundation case
             if to_top_card.rank != 0 {
@@ -552,17 +534,17 @@ impl Game {
     fn execute_move (&mut self, from: usize, to: usize) {
         // Execute the move
         // Move "from" card to "to" column
-        let from_card_opt = self.board.field[from].peek();
+        let from_card_opt = self.field[from].peek();
         match from_card_opt {
             Some(from_card) => {
-                self.board.field[from].pop();
-                self.board.field[to].push(from_card);
+                self.field[from].pop();
+                self.field[to].push(from_card);
             },
             None => {}
         }
         self.selected_card_opt = None;
         // Check to see if player won or unwon (due to undo)
-        self.won = self.board.field.iter().all(|&stack| stack.size() == RANKS);
+        self.won = self.field.iter().all(|&stack| stack.size() == RANKS);
     }
     fn player_try_execute_move(&mut self, from: usize, to: usize) {
         if self.move_is_valid(from, to) {
