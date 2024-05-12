@@ -6,7 +6,7 @@
 // #TODO X test to make sure winning (and undo after winning) works
 // #TODO X decorate foundations with suits
 // #TODO n condense top row representation when terminal is small, expand when large
-// #TODO   refactor, ci, lint, publish (lint: remove unnecessary "as" statements)
+// #TODO   refactor, ci, lint, document, publish (lint: remove unnecessary "as" statements)
 // #TODO ? fix windows terminal behavior
 // #TODO X variable terminal size
 // #TODO   member visibility (modules)
