@@ -17,10 +17,10 @@
 // #TODO X fix tableau empty column decoration and cursor visibility
 // #TODO X automatically stack cards onto foundation shortcut button
 // #TODO X implement "symbol blind" mode - cyan and yellow suits
-// #TODO   change array access to use iterators instead of indexing wherever possible, to prevent out of bounds errors
+// #TODO X change array access to use iterators instead of indexing wherever possible, to prevent out of bounds errors
 // #TODO   pet the coyote she has been so good
 
-use std::{cmp, io::{self, stdout, Stdout, Write}};
+use std::io::{self, stdout, Stdout, Write};
 
 use circular_buffer::CircularBuffer;
 use crossterm::{
@@ -241,8 +241,7 @@ impl Game {
     fn print_board(&self, out: &mut Stdout) -> Result<(), io::Error> {
         out.queue(terminal::Clear(terminal::ClearType::All))?;
 
-        for i in 0..FIELD_SIZE as usize {
-            let stack = self.board.field[i];
+        for (i, stack) in self.board.field.iter().enumerate() {
             let mut top_card = stack.peek().unwrap_or_default();
             let top_card_is_highlighted = self.highlighted_card as usize == i && self.won != true;
             if i < SUITS as usize {
@@ -564,9 +563,10 @@ impl Game {
     fn execute_move (&mut self, from: usize, to: usize) {
         // Execute the move
         // Move "from" card to "to" column
-        let from_card_opt = self.board.field[from].pop();
+        let from_card_opt = self.board.field[from].peek();
         match from_card_opt {
             Some(from_card) => {
+                self.board.field[from].pop();
                 self.board.field[to].push(from_card);
             },
             None => {}
