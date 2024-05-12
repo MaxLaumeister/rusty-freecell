@@ -6,7 +6,7 @@
 // #TODO X test to make sure winning (and undo after winning) works
 // #TODO X decorate foundations with suits
 // #TODO n condense top row representation when terminal is small, expand when large
-// #TODO   refactor, ci, lint, publish
+// #TODO   refactor, ci, lint, publish (lint: remove unnecessary "as" statements)
 // #TODO ? fix windows terminal behavior
 // #TODO X variable terminal size
 // #TODO   member visibility (modules)
@@ -38,6 +38,7 @@ const SPADES: u8 = 4;
 
 const FREE_CELLS: usize = 4;
 const TABLEAU_SIZE: usize = 8;
+const FIELD_SIZE: usize = SUITS + FREE_CELLS + TABLEAU_SIZE;
 
 const DEFAULT_TERMINAL_WIDTH: u16 = 80;
 const DEFAULT_TERMINAL_HEIGHT: u16 = 24;
@@ -81,11 +82,9 @@ struct Move {
 impl Deck {
     fn standard() -> Deck {
         let mut deck = Deck {cards: [Card {rank: 0, suit: 0}; DECK_SIZE as usize]};
-        for r in 0..RANKS {
-            for s in 0..SUITS {
-                deck.cards[(s*RANKS+r) as usize] = Card{rank: (r+1) as u8, suit: (s+1) as u8};
-            }
-        }
+        deck.cards.iter_mut().enumerate().for_each(|(i, card)| {
+            *card = Card { rank: (i % RANKS + 1) as u8, suit: (i / RANKS + 1) as u8 };
+        });
         deck
     }
     fn shuffle(&mut self, rng: &mut rand::rngs::ThreadRng) {
@@ -121,37 +120,62 @@ impl Deck {
 // }
 
 struct Board {
-    field: [[Card; DECK_SIZE as usize]; (SUITS + FREE_CELLS + TABLEAU_SIZE) as usize],
-    field_lengths: [usize; (SUITS + FREE_CELLS + TABLEAU_SIZE) as usize]
+    field: [CardStack; FIELD_SIZE]
+}
+
+#[derive(Copy, Clone)]
+struct CardStack {
+    cards: [Card; DECK_SIZE as usize],
+    length: usize
+}
+
+impl Default for CardStack {
+    fn default() -> Self {
+        CardStack {
+            cards: [Card::default(); DECK_SIZE],
+            length: 0,
+        }
+    }
+}
+
+impl CardStack {
+    fn push(&mut self, card: Card) {
+        self.cards[self.length] = card;
+        self.length += 1;
+    }
+    fn peek(&mut self) -> Option<Card> {
+        if self.length == 0 {
+            None
+        } else {
+            Some(self.cards[self.length - 1])
+        }
+    }
+    fn pop(&mut self) -> Option<Card> {
+        let card_opt = self.peek();
+        if self.length != 0 {
+            self.length -= 1;
+        }
+        card_opt
+    }
 }
 
 impl Board {
     fn new(rng: &mut rand::rngs::ThreadRng) -> Board {
         let mut board = Board {
-            field: [[Card::default(); DECK_SIZE as usize]; (SUITS + FREE_CELLS + TABLEAU_SIZE) as usize],
-            field_lengths: [0; (SUITS + FREE_CELLS + TABLEAU_SIZE) as usize]
+            field: [CardStack::default(); FIELD_SIZE]
         };
 
         let mut deck = Deck::standard();
         deck.shuffle(rng);
 
-        // Deal out onto the board
-        let mut tableau_column = 0;
-        for card in deck.cards {
-            board.put_on_tableau(card, tableau_column as usize);
-            tableau_column += 1;
-            if tableau_column >= TABLEAU_SIZE {
-                tableau_column = 0;
-            }
+        // Deal deck onto the board
+        for (i, card) in deck.cards.iter().enumerate() {
+            let field_column = (SUITS + FREE_CELLS) as usize + (i % TABLEAU_SIZE);
+            board.field[field_column][board.field_lengths[field_column]] = *card;
+            board.field[field_column].length += 1;
         }
 
         board
-    }
-
-    fn put_on_tableau(&mut self, c: Card, tableau_column: usize) {
-        let field_column = tableau_column + (SUITS + FREE_CELLS) as usize;
-        self.field[field_column][self.field_lengths[field_column]] = c;
-        self.field_lengths[field_column] += 1;
     }
 }
 
