@@ -24,7 +24,7 @@ use std::io::{self, stdout, Stdout, Write};
 
 use circular_buffer::CircularBuffer;
 use crossterm::{
-    cursor, event, style::{self, Stylize}, terminal, ExecutableCommand, QueueableCommand
+    cursor, style::{self, Stylize}, terminal, ExecutableCommand, QueueableCommand
 };
 
 const RANKS: usize = 13;
@@ -451,11 +451,8 @@ impl Game {
     }
 
     fn move_cursor_left(&mut self) {
-        if self.highlighted_card == 0 {
-            self.highlighted_card = SUITS + FREE_CELLS + TABLEAU_SIZE - 1;
-        } else {
-            self.highlighted_card -= 1;
-        }
+        // this modulo trick avoids negative numbers on the unsigned int
+        self.highlighted_card = (self.highlighted_card + FIELD_SIZE - 1) % FIELD_SIZE;
 
         match self.selected_card_opt {
             Some(selected_card) => {
@@ -472,11 +469,7 @@ impl Game {
     }
 
     fn move_cursor_right(&mut self) {
-        if self.highlighted_card >= SUITS + FREE_CELLS + TABLEAU_SIZE - 1 {
-            self.highlighted_card = 0;
-        } else {
-            self.highlighted_card += 1;
-        }
+        self.highlighted_card = (self.highlighted_card + 1) % FIELD_SIZE;
 
         match self.selected_card_opt {
             Some(selected_card) => {
@@ -609,49 +602,43 @@ fn run() -> Result<(), io::Error> {
 
     // Game loop
     loop {
-        let event = event::read()?;
+        let event = crossterm::event::read()?;
         match event {
-            event::Event::Key(key_event) => {
-                match key_event {
-                    event::KeyEvent {code: event::KeyCode::Char('q'), modifiers: event::KeyModifiers::CONTROL, kind: event::KeyEventKind::Press | event::KeyEventKind::Repeat, state: _} => {
-                        break
-                    },
-                    event::KeyEvent {code: event::KeyCode::Left, modifiers: event::KeyModifiers::NONE, kind: event::KeyEventKind::Press | event::KeyEventKind::Repeat, state: _} => {
-                        if !game.won {game.move_cursor_left();}
-                    },
-                    event::KeyEvent {code: event::KeyCode::Char('a'), modifiers: event::KeyModifiers::NONE, kind: event::KeyEventKind::Press | event::KeyEventKind::Repeat, state: _} => {
-                        if !game.won {game.move_cursor_left();}
-                    },
-                    event::KeyEvent {code: event::KeyCode::Right, modifiers: event::KeyModifiers::NONE, kind: event::KeyEventKind::Press | event::KeyEventKind::Repeat, state: _} => {
-                        if !game.won {game.move_cursor_right();}
-                    },
-                    event::KeyEvent {code: event::KeyCode::Char('d'), modifiers: event::KeyModifiers::NONE, kind: event::KeyEventKind::Press | event::KeyEventKind::Repeat, state: _} => {
-                        if !game.won {game.move_cursor_right();}
-                    },
-                    event::KeyEvent {code: event::KeyCode::Char(' '), modifiers: event::KeyModifiers::NONE, kind: event::KeyEventKind::Press | event::KeyEventKind::Repeat, state: _} => {
-                        if !game.won {game.handle_card_press();}
-                    },
-                    event::KeyEvent {code: event::KeyCode::Enter, modifiers: event::KeyModifiers::NONE, kind: event::KeyEventKind::Press | event::KeyEventKind::Repeat, state: _} => {
-                        if !game.won {game.handle_card_press();}
-                    },
-                    event::KeyEvent {code: event::KeyCode::Char('z'), modifiers: event::KeyModifiers::NONE, kind: event::KeyEventKind::Press | event::KeyEventKind::Repeat, state: _} => {
-                        game.perform_undo();
-                    },
-                    event::KeyEvent {code: event::KeyCode::Char('h'), modifiers: event::KeyModifiers::NONE, kind: event::KeyEventKind::Press | event::KeyEventKind::Repeat, state: _} => {
-                        game.toggle_high_contrast();
-                    },
-                    event::KeyEvent {code: event::KeyCode::Char('f'), modifiers: event::KeyModifiers::NONE, kind: event::KeyEventKind::Press | event::KeyEventKind::Repeat, state: _} => {
-                        game.quick_stack_to_foundations();
-                    },
-                    event::KeyEvent {code: event::KeyCode::Char('n'), modifiers: event::KeyModifiers::CONTROL, kind: event::KeyEventKind::Press | event::KeyEventKind::Repeat, state: _} => {
-                        game = Game::new(&mut rng);
-                    },
-                    _ => {
-                        
+            crossterm::event::Event::Key(key_event) => {
+                use crossterm::event::{KeyModifiers as MOD, KeyCode::{Char, Left, Right, Enter}, KeyEventKind::{Press, Repeat}};
+                if key_event.kind == Press || key_event.kind == Repeat {
+                    match (key_event.code, key_event.modifiers) {
+                        (Left | Char('a'), MOD::NONE) => {
+                            if !game.won {game.move_cursor_left();}
+                        },
+                        (Right | Char('d') , MOD::NONE) => {
+                            if !game.won {game.move_cursor_right();}
+                        },
+                        (Char(' ') | Enter, MOD::NONE) => {
+                            if !game.won {game.handle_card_press();}
+                        },
+                        (Char('z'), MOD::NONE) => {
+                            game.perform_undo();
+                        },
+                        (Char('h'), MOD::NONE) => {
+                            game.toggle_high_contrast();
+                        },
+                        (Char('f'), MOD::NONE) => {
+                            game.quick_stack_to_foundations();
+                        },
+                        (Char('n'), MOD::CONTROL) => {
+                            game = Game::new(&mut rng);
+                        },
+                        (Char('q'), MOD::CONTROL) => {
+                            break
+                        },
+                        _ => {
+                            
+                        }
                     }
                 }
             },
-            event::Event::Resize(_term_width, _term_height) => {
+            crossterm::event::Event::Resize(_term_width, _term_height) => {
                 // Resize event falls through and triggers game to print again
             }
             _ => {}
