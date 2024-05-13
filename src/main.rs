@@ -118,7 +118,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //std::env::set_var("RUST_BACKTRACE", "1");
     let (term_width, term_height) = terminal::size()?;
     if term_width < MIN_TERMINAL_WIDTH || term_height < MIN_TERMINAL_HEIGHT {
-        println!("Your terminal window is too small for FreeCell! It's gotta be at least {} chars wide and {} chars tall.", MIN_TERMINAL_WIDTH, MIN_TERMINAL_HEIGHT);
+        println!("Your terminal window is too small for FreeCell! It's gotta be at least {MIN_TERMINAL_WIDTH} chars wide and {MIN_TERMINAL_HEIGHT} chars tall.");
         return Err("terminal too small".into());
     }
     run()?;

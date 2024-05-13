@@ -161,8 +161,8 @@ impl Game {
 
     fn move_is_valid(&self, from: usize, to: usize) -> bool {
         if from == to {return false;};
-        let from_top_card = self.field[from].last().cloned().unwrap_or_default();
-        let to_top_card = self.field[to].last().cloned().unwrap_or_default();
+        let from_top_card = self.field[from].last().copied().unwrap_or_default();
+        let to_top_card = self.field[to].last().copied().unwrap_or_default();
         if to < SUITS {
             // Foundation case
             if to_top_card.rank != 0 {

@@ -39,7 +39,7 @@ impl Game {
         out.queue(terminal::Clear(terminal::ClearType::All))?;
 
         for (i, stack) in self.field.iter().enumerate() {
-            let mut top_card = stack.last().cloned().unwrap_or_default();
+            let mut top_card = stack.last().copied().unwrap_or_default();
             let top_card_is_highlighted = self.highlighted_card == i && !self.won;
             if i < SUITS {
                 // Print foundation
@@ -106,7 +106,7 @@ impl Game {
         out.queue(cursor::MoveTo(0, 0))?;
         print!("╭── Rusty FreeCell ────────────────────────────────────────╮");
         out.queue(cursor::MoveTo(40, 0))?;
-        print!(" Moves: {} ", move_count);
+        print!(" Moves: {move_count} ");
 
         // Print side bars
 
@@ -130,28 +130,25 @@ impl Game {
         if selected {
             card_display_str= format!("\
                 ╭─────╮\n\
-                │ {: <3} │\n\
+                │ {card_suit_rank_str: <3} │\n\
                 │     │\n\
                 │  △  │\n\
-                ╰─────╯\n",
-                card_suit_rank_str);
+                ╰─────╯\n");
         } else if card.rank == 0 {
             // Print suit-decorated placeholder
             card_display_str= format!("\
             ╭─────╮\n\
             │     │\n\
-            │ {}  │\n\
+            │ {card_suit_rank_str}  │\n\
             │     │\n\
-            ╰─────╯\n",
-            card_suit_rank_str);
+            ╰─────╯\n");
         } else {
             card_display_str= format!("\
             ╭─────╮\n\
-            │ {: <3} │\n\
+            │ {card_suit_rank_str: <3} │\n\
             │     │\n\
             │     │\n\
-            ╰─────╯\n",
-            card_suit_rank_str);
+            ╰─────╯\n");
         }
 
         for (d, line) in card_display_str.lines().enumerate() {
@@ -179,7 +176,7 @@ impl Game {
                             print!("{}", line.with(style::Color::Yellow));
                         },
                         _ => {
-                            print!("{}", line);
+                            print!("{line}");
                         }
                     }
                 } else {
@@ -188,12 +185,12 @@ impl Game {
                             print!("{}", line.with(style::Color::Red));
                         },
                         _ => {
-                            print!("{}", line);
+                            print!("{line}");
                         }
                     }
                 }
             } else {
-                print!("{}", line);
+                print!("{line}");
             }
 
             if highlighted {
@@ -222,7 +219,7 @@ impl Game {
     fn print_string_at_coord(out: &mut io::Stdout, string: &str, x: u16, y: u16) -> Result<(), io::Error> {
         for (i, line) in string.lines().enumerate() {
             out.queue(cursor::MoveTo(x, y + i as u16))?;
-            print!("{}", line);
+            print!("{line}");
         }
         Ok(())
     }
