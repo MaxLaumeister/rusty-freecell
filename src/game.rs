@@ -126,13 +126,8 @@ impl Game {
             self.selected_card_opt = None;
         } else {
             // Execute a move
-            match self.selected_card_opt {
-                Some(selected_card) => {
-                    self.player_try_execute_move(selected_card, self.highlighted_card);
-                }
-                None => {
-
-                }
+            if let Some(selected_card) = self.selected_card_opt {
+                self.player_try_execute_move(selected_card, self.highlighted_card);
             }
         }
     }
@@ -193,12 +188,9 @@ impl Game {
         // Execute the move
         // Move "from" card to "to" column
         let from_card_opt = self.field[from].last();
-        match from_card_opt {
-            Some(&from_card) => {
-                self.field[from].pop();
-                self.field[to].push(from_card);
-            },
-            None => {}
+        if let Some(&from_card) = from_card_opt {
+            self.field[from].pop();
+            self.field[to].push(from_card);
         }
         self.selected_card_opt = None;
         // Check to see if player won or unwon (due to undo)

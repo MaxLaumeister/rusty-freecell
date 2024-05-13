@@ -22,14 +22,14 @@ impl Game {
     pub fn print(&self, out: &mut io::Stdout) -> Result<(), io::Error> {
         if !self.is_won() {
             self.print_board(out)?;
-            self.print_chrome(out)?;
+            Game::print_chrome(out, self.move_count)?;
         } else {
             // won
             out.queue(style::SetAttribute(style::Attribute::Dim))?;
             self.print_board(out)?;
             out.queue(style::SetAttribute(style::Attribute::Reset))?;
-            self.print_chrome(out)?;
-            self.print_win(out)?;
+            Game::print_chrome(out, self.move_count)?;
+            Game::print_win(out)?;
         }
         out.flush()?;
         Ok(())
@@ -47,7 +47,7 @@ impl Game {
                 if top_card == Card::default() {
                     top_card = Card{rank: 0, suit: i as u8 + 1};
                 }
-                self.print_card_at_coord(
+                Game::print_card_at_coord(
                     out,
                     i * CARD_PRINT_WIDTH + 1, 
                     1, 
@@ -58,7 +58,7 @@ impl Game {
                 )?;
             } else if i < (SUITS + FREE_CELLS) {
                 // Print free cell
-                self.print_card_at_coord(
+                Game::print_card_at_coord(
                     out,
                     i * CARD_PRINT_WIDTH + 3,
                     1, top_card,
@@ -71,7 +71,7 @@ impl Game {
                 let mut card_stack_iter = stack.iter().enumerate().peekable();
                 while let Some((y, &card)) = card_stack_iter.next() {
                     let is_top_card = card_stack_iter.peek().is_none(); // Check if we are currently printing the top card
-                    self.print_card_at_coord(
+                    Game::print_card_at_coord(
                         out,
                         (i - (SUITS + FREE_CELLS)) * CARD_PRINT_WIDTH + 2,
                         y * TABLEAU_VERTICAL_OFFSET + CARD_PRINT_HEIGHT + 1,
@@ -83,7 +83,7 @@ impl Game {
                 }
                 // If tableau column is empty, print placeholder instead
                 if stack.is_empty() {
-                    self.print_card_at_coord(
+                    Game::print_card_at_coord(
                         out,
                         (i - (SUITS + FREE_CELLS)) * CARD_PRINT_WIDTH + 2,
                         CARD_PRINT_HEIGHT + 1,
@@ -99,14 +99,14 @@ impl Game {
         Ok(())
     }
 
-    fn print_chrome(&self, out: &mut std::io::Stdout) -> Result<(), io::Error> {
+    fn print_chrome(out: &mut std::io::Stdout, move_count: u32) -> Result<(), io::Error> {
         let (_term_width, term_height) = terminal::size().unwrap_or((DEFAULT_TERMINAL_WIDTH, DEFAULT_TERMINAL_HEIGHT));
         
         // Print title bar
         out.queue(cursor::MoveTo(0, 0))?;
         print!("╭── Rusty FreeCell ────────────────────────────────────────╮");
         out.queue(cursor::MoveTo(40, 0))?;
-        print!(" Moves: {} ", self.move_count);
+        print!(" Moves: {} ", move_count);
 
         // Print side bars
 
@@ -124,7 +124,7 @@ impl Game {
         Ok(())
     }
 
-    fn print_card_at_coord(&self, out: &mut io::Stdout, x: usize, y: usize, card: Card, highlighted: bool, selected: bool, high_contrast: bool)  -> Result<(), io::Error> {
+    fn print_card_at_coord(out: &mut io::Stdout, x: usize, y: usize, card: Card, highlighted: bool, selected: bool, high_contrast: bool)  -> Result<(), io::Error> {
         let card_suit_rank_str = RANK_STRINGS[card.rank as usize].to_owned() + SUIT_STRINGS[card.suit as usize];
         let card_display_str;
         if selected {
@@ -206,10 +206,10 @@ impl Game {
         Ok(())
     }
 
-    fn print_win (&self, out: &mut io::Stdout) -> Result<(), io::Error> {
+    fn print_win (out: &mut io::Stdout) -> Result<(), io::Error> {
         let win_message_width = 20;
         let win_message_height = 4;
-        self.print_string_at_coord(out,   
+        Game::print_string_at_coord(out,   
         "╭──────────────────╮\n\
                  │ You Win!         │\n\
                  │ New Game: ctrl-n │\n\
@@ -219,7 +219,7 @@ impl Game {
         Ok(())
     }
 
-    fn print_string_at_coord(&self, out: &mut io::Stdout, string: &str, x: u16, y: u16) -> Result<(), io::Error> {
+    fn print_string_at_coord(out: &mut io::Stdout, string: &str, x: u16, y: u16) -> Result<(), io::Error> {
         for (i, line) in string.lines().enumerate() {
             out.queue(cursor::MoveTo(x, y + i as u16))?;
             print!("{}", line);
