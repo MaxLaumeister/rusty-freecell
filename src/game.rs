@@ -1,11 +1,9 @@
-use std::io::{self, Write};
 
 use circular_buffer::CircularBuffer;
-use crossterm::{cursor, style::{self, Stylize}, terminal, QueueableCommand};
 
 use rand::seq::SliceRandom;
 
-use crate::{cards::{new_standard_deck, Card}, MIN_TERMINAL_WIDTH};
+use crate::cards::{new_standard_deck, Card};
 
 const RANKS: usize = 13;
 const SUITS: usize = 4;

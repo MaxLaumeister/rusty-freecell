@@ -23,14 +23,12 @@
 mod game;
 mod cards;
 
-use crate::cards::Card;
 use crate::game::Game;
 
-use std::io::{self, stdout, Stdout, Write};
+use std::io::{self, stdout};
 
-use circular_buffer::CircularBuffer;
 use crossterm::{
-    cursor, style::{self, Stylize}, terminal, ExecutableCommand, QueueableCommand
+    cursor, terminal, ExecutableCommand
 };
 
 const MIN_TERMINAL_WIDTH: u16 = 60;
