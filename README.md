@@ -2,6 +2,8 @@
 
 A [FreeCell](https://en.wikipedia.org/wiki/FreeCell) solitaire card game in Rust, with a text-based user interface. Uses [crossterm](https://github.com/crossterm-rs/crossterm) for TUI output.
 
+![Screenshot of Rusty FreeCell](screenshot.png)
+
 ## How To Play
 
 Head over to the [releases page](releases/) and grab a binary for Windows, MacOS or Linux. It's a command-line application, so run it from your terminal.
