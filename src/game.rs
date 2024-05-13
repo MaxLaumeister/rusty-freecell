@@ -5,9 +5,9 @@ use rand::seq::SliceRandom;
 
 use crate::cards::{new_standard_deck, Card};
 
-const RANKS: usize = 13;
-const SUITS: usize = 4;
-const DECK_SIZE: usize = RANKS* SUITS;
+const RANKS: u8 = 13;
+const SUITS: u8 = 4;
+const DECK_SIZE: usize = RANKS as usize * SUITS as usize;
 
 const HEARTS: u8 = 1;
 const CLUBS: u8 = 2;
@@ -16,14 +16,14 @@ const SPADES: u8 = 4;
 
 const FREE_CELLS: usize = 4;
 const TABLEAU_SIZE: usize = 8;
-const FIELD_SIZE: usize = SUITS + FREE_CELLS + TABLEAU_SIZE;
+const FIELD_SIZE: usize = SUITS as usize + FREE_CELLS + TABLEAU_SIZE;
 
 const UNDO_LEVELS: usize = 1000;
 
 #[derive(Default, Copy, Clone)]
 struct Move {
-    from: u8,
-    to: u8
+    from: usize,
+    to: usize
 }
 
 pub struct Game {
@@ -40,7 +40,7 @@ impl Game {
     pub fn new(rng: &mut rand::rngs::ThreadRng) -> Game {
         let mut game = Game {
             field: core::array::from_fn(|_| Vec::with_capacity(DECK_SIZE)),
-            highlighted_card: SUITS + FREE_CELLS,
+            highlighted_card: SUITS as usize + FREE_CELLS,
             selected_card_opt: None,
             undo_history: CircularBuffer::new(),
             move_count: 0,
@@ -52,7 +52,7 @@ impl Game {
         let mut deck = new_standard_deck(RANKS, SUITS);
         deck.shuffle(rng);
         for (i, card) in deck.into_iter().enumerate() {
-            let field_column = SUITS + FREE_CELLS + (i % TABLEAU_SIZE);
+            let field_column = SUITS as usize + FREE_CELLS + (i % TABLEAU_SIZE);
             game.field[field_column].push(card);
         }
 
@@ -105,7 +105,7 @@ impl Game {
         let mut made_move = false;
 
         'outer: for source_column in 0..self.field.len() {
-            for target_column in 0..SUITS {
+            for target_column in 0..SUITS as usize {
                 if self.move_is_valid(source_column, target_column) {
                     self.player_try_execute_move(source_column, target_column);
                     made_move = true;
@@ -136,21 +136,15 @@ impl Game {
             // Execute move, add to undo history
             self.execute_move(from, to);
             self.move_count += 1;
-            self.undo_history.push_back(Move{from: from as u8, to: to as u8});
+            self.undo_history.push_back(Move{from, to});
         }
     }
     pub fn perform_undo(&mut self) {
         let last_move_opt = self.undo_history.pop_back();
-        match last_move_opt {
-            Some(last_move) => {
-                // Perform move in reverse, without checking if it follows the rules
-                self.execute_move(last_move.to as usize, last_move.from as usize);
-                self.move_count -= 1;
-            }
-            None => {
-                // History empty
-            }
-        }
+        if let Some(last_move) = last_move_opt {
+            self.execute_move(last_move.to, last_move.from);
+            self.move_count -= 1;
+        } // Else history is empty
     }
 
     fn are_opposite_colors(card1: Card, card2: Card) -> bool {
@@ -163,23 +157,21 @@ impl Game {
         if from == to {return false;};
         let from_top_card = self.field[from].last().copied().unwrap_or_default();
         let to_top_card = self.field[to].last().copied().unwrap_or_default();
-        if to < SUITS {
+        if to < SUITS as usize {
             // Foundation case
             if to_top_card.rank != 0 {
                     return from_top_card.rank == to_top_card.rank + 1 && from_top_card.suit == to_top_card.suit;
-            } else {
-                    return from_top_card.rank == 1 && to as u8 == from_top_card.suit - 1;
             }
-        } else if to < SUITS + FREE_CELLS {
+            return from_top_card.rank == 1 && to == (from_top_card.suit - 1) as usize;
+        } else if to < SUITS as usize + FREE_CELLS {
             // Free cell case
             return to_top_card.rank == 0;
-        } else if to < SUITS + FREE_CELLS + TABLEAU_SIZE {
+        } else if to < SUITS as usize + FREE_CELLS + TABLEAU_SIZE {
             // Tableau case
             if to_top_card.rank != 0 {
                 return from_top_card.rank == to_top_card.rank - 1 && Game::are_opposite_colors(from_top_card, to_top_card);
-            } else {
-                return true;
             }
+            return true;
         }
         false
     }
@@ -194,7 +186,7 @@ impl Game {
         }
         self.selected_card_opt = None;
         // Check to see if player won or unwon (due to undo)
-        self.won = self.field.iter().all(|stack| stack.len() == RANKS);
+        self.won = self.field.iter().all(|stack| stack.len() == RANKS as usize);
     }
 }
 

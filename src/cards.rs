@@ -10,12 +10,12 @@ impl PartialEq for Card {
     }
 }
 
-pub fn new_standard_deck(ranks: usize, suits: usize) -> Vec<Card> {
+pub fn new_standard_deck(ranks: u8, suits: u8) -> Vec<Card> {
         (0..ranks*suits).map(
             |i|
             Card {
-                rank: (i % ranks + 1) as u8,
-                suit: (i / ranks + 1) as u8 
+                rank: (i % ranks + 1),
+                suit: (i / ranks + 1)
             }
         ).collect()
 }

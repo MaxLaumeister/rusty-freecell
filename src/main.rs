@@ -18,7 +18,7 @@
 // #TODO X implement "symbol blind" mode - cyan and yellow suits
 // #TODO X change array access to use iterators instead of indexing wherever possible, to prevent out of bounds errors
 // #TODO X refactor
-// #TODO   lint
+// #TODO X lint
 // #TODO   document
 // #TODO   ci
 // #TODO   publish
