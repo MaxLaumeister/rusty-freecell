@@ -40,8 +40,8 @@ impl Game {
 
         for (i, stack) in self.field.iter().enumerate() {
             let mut top_card = stack.last().cloned().unwrap_or_default();
-            let top_card_is_highlighted = self.highlighted_card as usize == i && self.won != true;
-            if i < SUITS as usize {
+            let top_card_is_highlighted = self.highlighted_card == i && !self.won;
+            if i < SUITS {
                 // Print foundation
                 // If card is a placeholder, assign a suit for decoration
                 if top_card == Card::default() {
@@ -56,7 +56,7 @@ impl Game {
                     self.selected_card_opt == Some(i),
                     self.high_contrast
                 )?;
-            } else if i < (SUITS + FREE_CELLS) as usize {
+            } else if i < (SUITS + FREE_CELLS) {
                 // Print free cell
                 self.print_card_at_coord(
                     out,
@@ -66,14 +66,14 @@ impl Game {
                     self.selected_card_opt == Some(i),
                     self.high_contrast
                 )?;
-            } else if i < (SUITS + FREE_CELLS + TABLEAU_SIZE) as usize {
+            } else if i < (SUITS + FREE_CELLS + TABLEAU_SIZE) {
                 // Print tableau column card-by-card
-                let mut card_stack_iter = stack.into_iter().enumerate().peekable();
+                let mut card_stack_iter = stack.iter().enumerate().peekable();
                 while let Some((y, &card)) = card_stack_iter.next() {
                     let is_top_card = card_stack_iter.peek().is_none(); // Check if we are currently printing the top card
                     self.print_card_at_coord(
                         out,
-                        (i - (SUITS + FREE_CELLS) as usize) * CARD_PRINT_WIDTH + 2,
+                        (i - (SUITS + FREE_CELLS)) * CARD_PRINT_WIDTH + 2,
                         y * TABLEAU_VERTICAL_OFFSET + CARD_PRINT_HEIGHT + 1,
                         card,
                         top_card_is_highlighted && is_top_card,
@@ -85,7 +85,7 @@ impl Game {
                 if stack.is_empty() {
                     self.print_card_at_coord(
                         out,
-                        (i - (SUITS + FREE_CELLS) as usize) * CARD_PRINT_WIDTH + 2,
+                        (i - (SUITS + FREE_CELLS)) * CARD_PRINT_WIDTH + 2,
                         CARD_PRINT_HEIGHT + 1,
                         top_card,
                         top_card_is_highlighted,
@@ -100,7 +100,7 @@ impl Game {
     }
 
     fn print_chrome(&self, out: &mut std::io::Stdout) -> Result<(), io::Error> {
-        let (_term_width, term_height) = terminal::size().unwrap_or_else(|_| (DEFAULT_TERMINAL_WIDTH, DEFAULT_TERMINAL_HEIGHT));
+        let (_term_width, term_height) = terminal::size().unwrap_or((DEFAULT_TERMINAL_WIDTH, DEFAULT_TERMINAL_HEIGHT));
         
         // Print title bar
         out.queue(cursor::MoveTo(0, 0))?;
@@ -214,7 +214,7 @@ impl Game {
                  │ You Win!         │\n\
                  │ New Game: ctrl-n │\n\
                  ╰──────────────────╯",
-                (MIN_TERMINAL_WIDTH / 2 - win_message_width / 2) as u16,
+                MIN_TERMINAL_WIDTH / 2 - win_message_width / 2,
                 (TYPICAL_BOARD_HEIGHT / 2 - win_message_height / 2) as u16)?;
         Ok(())
     }

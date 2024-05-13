@@ -6,7 +6,6 @@
 // #TODO X test to make sure winning (and undo after winning) works
 // #TODO X decorate foundations with suits
 // #TODO n condense top row representation when terminal is small, expand when large
-// #TODO   refactor, ci, lint, document, publish (lint: remove unnecessary "as" statements)
 // #TODO ? fix windows terminal behavior
 // #TODO X variable terminal size
 // #TODO X member visibility (modules)
@@ -18,6 +17,11 @@
 // #TODO X automatically stack cards onto foundation shortcut button
 // #TODO X implement "symbol blind" mode - cyan and yellow suits
 // #TODO X change array access to use iterators instead of indexing wherever possible, to prevent out of bounds errors
+// #TODO X refactor
+// #TODO   lint
+// #TODO   document
+// #TODO   ci
+// #TODO   publish
 // #TODO   pet the coyote she has been so good
 
 mod game;

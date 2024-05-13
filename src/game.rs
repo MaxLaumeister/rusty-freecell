@@ -77,7 +77,7 @@ impl Game {
                 }
             }
             None => {
-                while self.field[self.highlighted_card].last() == None {
+                while self.field[self.highlighted_card].last().is_none() {
                     self.move_cursor_left();
                 }
             }
@@ -94,7 +94,7 @@ impl Game {
                 }
             }
             None => {
-                while self.field[self.highlighted_card].last() == None {
+                while self.field[self.highlighted_card].last().is_none() {
                     self.move_cursor_right();
                 }
             }
@@ -118,7 +118,7 @@ impl Game {
     }
 
     pub fn handle_card_press(&mut self) {
-        if self.selected_card_opt == None {
+        if self.selected_card_opt.is_none() {
             // Select a card
             self.selected_card_opt = Some(self.highlighted_card);
         } else if Some(self.highlighted_card) == self.selected_card_opt {
