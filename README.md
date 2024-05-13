@@ -1,6 +1,6 @@
 # Rusty FreeCell
 
-A [FreeCell](https://en.wikipedia.org/wiki/FreeCell) solitaire card game in Rust, with a text-based user interface.
+A [FreeCell](https://en.wikipedia.org/wiki/FreeCell) solitaire card game in Rust, with a text-based user interface. Uses [crossterm](https://github.com/crossterm-rs/crossterm) for TUI output.
 
 ## How To Play
 
@@ -37,3 +37,9 @@ To build and run Rusty FreeCell from source, [install Rust using rustup](https:/
 ```
 cargo run --release
 ```
+
+## Documentation
+
+See: [rusty-freecell documentation](https://www.maxlaumeister.com/software/rusty-freecell/docs/rusty_freecell/)
+
+Documentation for rusty-freecell is automatically generated from the `main` branch using a GitHub action. 
