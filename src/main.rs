@@ -24,6 +24,11 @@
 // #TODO   publish
 // #TODO   pet the coyote she has been so good
 
+#![warn(
+    clippy::all,
+    clippy::pedantic
+)]
+
 mod game;
 mod cards;
 
@@ -111,7 +116,7 @@ fn cleanup() {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     //std::env::set_var("RUST_BACKTRACE", "1");
-    let (term_width, term_height) = terminal::size().unwrap();
+    let (term_width, term_height) = terminal::size()?;
     if term_width < MIN_TERMINAL_WIDTH || term_height < MIN_TERMINAL_HEIGHT {
         println!("Your terminal window is too small for FreeCell! It's gotta be at least {} chars wide and {} chars tall.", MIN_TERMINAL_WIDTH, MIN_TERMINAL_HEIGHT);
         return Err("terminal too small".into());
