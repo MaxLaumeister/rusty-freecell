@@ -9,7 +9,7 @@
 // #TODO   refactor, ci, lint, document, publish (lint: remove unnecessary "as" statements)
 // #TODO ? fix windows terminal behavior
 // #TODO X variable terminal size
-// #TODO   member visibility (modules)
+// #TODO X member visibility (modules)
 // #TODO X only allow card to be on matching foundation spot
 // #TODO X get rid of memory allocations/heap (String usage) wherever possible
 // #TODO X don't allow cursor to rest on empty space, when not in select mode

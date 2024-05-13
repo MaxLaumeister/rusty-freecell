@@ -5,7 +5,7 @@ use crossterm::{cursor, style::{self, Stylize}, terminal, QueueableCommand};
 
 use rand::seq::SliceRandom;
 
-use crate::cards::{new_standard_deck, Card};
+use crate::{cards::{new_standard_deck, Card}, MIN_TERMINAL_WIDTH};
 
 const RANKS: usize = 13;
 const SUITS: usize = 4;
@@ -258,7 +258,7 @@ impl Game {
                  │ You Win!         │\n\
                  │ New Game: ctrl-n │\n\
                  ╰──────────────────╯",
-                (/* magic */ 58 / 2 - win_message_width / 2) as u16,
+                (MIN_TERMINAL_WIDTH / 2 - win_message_width / 2) as u16,
                 (TYPICAL_BOARD_HEIGHT / 2 - win_message_height / 2) as u16)?;
         Ok(())
     }
