@@ -20,8 +20,8 @@
 // #TODO X change array access to use iterators instead of indexing wherever possible, to prevent out of bounds errors
 // #TODO   pet the coyote she has been so good
 
-mod cards;
 mod game;
+mod cards;
 
 use crate::cards::Card;
 use crate::game::Game;
