@@ -87,6 +87,8 @@ impl Game {
         // Deal deck onto the board
         let mut deck = new_standard_deck(RANKS, SUITS);
         deck.shuffle(rng);
+        //deck.sort_by_key(|card| card.rank); // for testing
+        //deck.reverse(); // for testing
         for (i, card) in deck.into_iter().enumerate() {
             let field_column = FOUNDATIONS + FREE_CELLS + (i % TABLEAU_SIZE);
             game.field[field_column].push(card);

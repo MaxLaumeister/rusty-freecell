@@ -19,11 +19,12 @@
 // #TODO X change array access to use iterators instead of indexing wherever possible, to prevent out of bounds errors
 // #TODO X refactor
 // #TODO X lint
-// #TODO   document
+// #TODO X document
 // #TODO X get rid of "won" in game state, compute it dynamically from a function
-// #TODO   ci
+// #TODO X ci
+// #TODO n releases
 // #TODO   publish
-// #TODO   pet the coyote she has been so good
+// #TODO x pet the coyote she has been so good
 
 //! A `FreeCell` game written in Rust
 
