@@ -1,31 +1,3 @@
-// #TODO n eliminate terminal flicker
-// #TODO X error handling
-// #TODO n moving multiple cards at once (shortcut)
-// #TODO X move count
-// #TODO X implement winning screen
-// #TODO X test to make sure winning (and undo after winning) works
-// #TODO X decorate foundations with suits
-// #TODO n condense top row representation when terminal is small, expand when large
-// #TODO ? fix windows terminal behavior
-// #TODO X variable terminal size
-// #TODO X member visibility (modules)
-// #TODO X only allow card to be on matching foundation spot
-// #TODO X get rid of memory allocations/heap (String usage) wherever possible
-// #TODO X don't allow cursor to rest on empty space, when not in select mode
-// #TODO X fix foundation decoration rendering when card is selected
-// #TODO X fix tableau empty column decoration and cursor visibility
-// #TODO X automatically stack cards onto foundation shortcut button
-// #TODO X implement "symbol blind" mode - cyan and yellow suits
-// #TODO X change array access to use iterators instead of indexing wherever possible, to prevent out of bounds errors
-// #TODO X refactor
-// #TODO X lint
-// #TODO X document
-// #TODO X get rid of "won" in game state, compute it dynamically from a function
-// #TODO X ci
-// #TODO n releases
-// #TODO   publish
-// #TODO x pet the coyote she has been so good
-
 //! A `FreeCell` game written in Rust
 
 #![warn(
