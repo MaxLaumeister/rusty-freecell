@@ -6,12 +6,6 @@ A [FreeCell](https://en.wikipedia.org/wiki/FreeCell) solitaire card game in Rust
 
 ## How To Play
 
-Head over to the [releases page](releases/) and grab a binary for Windows, MacOS or Linux. It's a command-line application, so run it from your terminal.
-
-```
-./rustyfreecell
-```
-
 For FreeCell solitaire rules, [check Wikipedia](https://en.wikipedia.org/wiki/FreeCell).
 
 ### Controls
@@ -32,9 +26,9 @@ For FreeCell solitaire rules, [check Wikipedia](https://en.wikipedia.org/wiki/Fr
 
 <kbd>CTRL</kbd> + <kbd>Q</kbd> - Quit to terminal
 
-## Building From Source
+## Building/Running
 
-To build and run Rusty FreeCell from source, [install Rust using rustup](https://www.rust-lang.org/tools/install). Then in the source directory:
+To build and run Rusty FreeCell, [install Rust using rustup](https://www.rust-lang.org/tools/install). Then in the source directory:
 
 ```
 cargo run --release
