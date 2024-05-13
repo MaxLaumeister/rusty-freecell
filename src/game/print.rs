@@ -59,7 +59,7 @@ impl Game {
 
         for (i, stack) in self.field.iter().enumerate() {
             let mut top_card = stack.last().copied().unwrap_or_default();
-            let top_card_is_highlighted = self.highlighted_card == i && !self.won;
+            let top_card_is_highlighted = self.highlighted_card == i && !self.is_won();
             if i < FOUNDATIONS {
                 // Print foundation
                 // If card is a placeholder, assign a suit for decoration

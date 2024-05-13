@@ -62,9 +62,6 @@ pub struct Game {
 
     /// Indicates whether the game is in high contrast mode, where each suit is printed in a different color.
     high_contrast: bool,
-
-    /// Indicates whether the game has been won.
-    won: bool,
 }
 
 impl Game {
@@ -84,8 +81,7 @@ impl Game {
             selected_card_opt: None,
             undo_history: CircularBuffer::new(),
             move_count: 0,
-            high_contrast: false,
-            won: false
+            high_contrast: false
         };
 
         // Deal deck onto the board
@@ -105,7 +101,8 @@ impl Game {
     ///
     /// `true` if the game has been won, otherwise `false`.
     pub fn is_won(&self) -> bool {
-        self.won
+        // Check if all foundation piles are full
+        self.field.iter().take(FOUNDATIONS).all(|stack| stack.len() == RANKS as usize)
     }
     
     /// Toggles high contrast mode, making diamonds magenta and spades yellow.
@@ -245,8 +242,6 @@ impl Game {
             self.field[to].push(from_card);
         }
         self.selected_card_opt = None;
-        // Check to see if player won or unwon (due to undo)
-        self.won = self.field.iter().all(|stack| stack.len() == RANKS as usize);
     }
 }
 

@@ -20,7 +20,7 @@
 // #TODO X refactor
 // #TODO X lint
 // #TODO   document
-// #TODO   get rid of "won" in game state, compute it dynamically from a function
+// #TODO X get rid of "won" in game state, compute it dynamically from a function
 // #TODO   ci
 // #TODO   publish
 // #TODO   pet the coyote she has been so good
