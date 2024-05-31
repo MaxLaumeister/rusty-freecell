@@ -36,6 +36,6 @@ cargo run --release
 
 ## Documentation
 
-See: [rusty-freecell documentation](https://www.maxlaumeister.com/software/rusty-freecell/docs/rusty_freecell/)
+See: [rusty-freecell documentation](https://rusty-freecell-docs.maxlaumeister.com/rusty_freecell/)
 
 Documentation for rusty-freecell is automatically generated from the `main` branch using a GitHub action. 
